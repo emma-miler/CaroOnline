@@ -22,6 +22,9 @@ class Piece {
         this.x = x
         this.y = y
         this.color = color
+
+        this.pinned = false
+        this.hasMoved = false
     }
 }
 
@@ -85,6 +88,15 @@ class Board {
     }
 
     setup() {
+        this.turn = Color.WHITE
+        this.checks = [false, false]
+        this.checkPieces = []
+        this.checkStopSquares = []
+        this.moveList = []
+        this.updateBoard()
+    }
+
+    updateBoard() {
         this.grid = [
             [0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,0],
@@ -98,8 +110,59 @@ class Board {
         for (const piece of this.pieces) {
             this.grid[piece.x][piece.y] = piece
         }
-        this.pieces[0].color = Color.WHITE
-        console.log(this.grid)
+    }
+
+    performMove(move) {
+        var piece = this.grid[move.x][move.y]
+        var newSquare = this.grid[move.x + move.dx][move.y + move.dy]
+        if ( move.isPromotion) {
+            piece.type = move.promoteTo
+        }
+        if ( newSquare != 0) {
+            this.removePiece([newSquare.x, newSquare.y])
+        }
+        if ( move.isEnPassant) {
+            this.removePiece([move.x + move.dx, move.y + move.dy - (this.turn == Color.WHITE ? 1:-1)])
+        }
+        print("TESTING")
+        print(move)
+        if ( move.isCastleShort) {
+            print("CASTLED SHORT!!")
+            if ( piece.color == Color.WHITE) {
+                this.grid[7][0].x = 5
+            }
+            else if ( piece.color == Color.BLACK) {
+                this.grid[7][7].x = 5
+            }
+        }
+        if ( move.isCastleLong) {
+            if ( piece.color == Color.WHITE) {
+                this.grid[0][0].x = 3
+            }
+            else if ( piece.color == Color.BLACK) {
+                this.grid[0][7].x = 3
+            }
+        }
+        piece.x = move.x + move.dx
+        piece.y = move.y + move.dy
+        piece.hasMoved = true
+        this.moveList.push(move)
+        this.updateBoard()
+    }
+
+    removePiece(p) {
+        var piece = this.grid[p[0]][p[1]]
+        var y = undefined
+        for (var x = 0; x < this.pieces.length; x++) {
+            if (this.pieces[x] == piece) {
+                y = x
+            }
+        }
+        if (typeof(y) == "number") {
+            // TODO: FIX THIS NOT WORKING
+            //this.pieces.pop(y - 1)
+        }
+        this.updateBoard()
     }
 }
 
@@ -117,10 +180,10 @@ class graphicsHandler {
         this.image = document.getElementById("chesspieces")
 
         function lmbClick(event) {
-            var xc = event.pageX - this.canvas.offsetLeft
-            var yc = event.pageY - this.canvas.offsetTop
+            var xc = event.pageX + this.canvas.offsetLeft/2
+            var yc = event.pageY + this.canvas.offsetTop/2
     
-            var h = this.canvas.height
+            var h = this.canvas.width
             var s = h/8
             
             var x = Math.floor(xc / s)
@@ -133,6 +196,33 @@ class graphicsHandler {
             if (this.selected == 0) {
                 this.selected = this.board.grid[x][7 - y]
                 print(this.selected)
+            }
+            else {
+                var sx = this.selected.x
+                var sy = this.selected.y
+                var succes = false
+                // Generate moves and check if clicked square is legal
+                for (const move of generateMoves(this.selected, this.board)) {
+                    if (x == sx + move.dx && 7 - y == sy + move.dy) {
+                        if (move.isPromotion) {
+                            this.drawPromotionDialog = true
+                        }
+                        else {
+                            this.board.performMove(move)
+                            this.selected = 0
+                            console.log("Turn: " + Object.keys(Color)[this.board.turn.value + 1 < Object.keys(Color).length ? this.board.turn.value + 1 : 0])
+                            this.board.turn = Color[Object.keys(Color)[this.board.turn.value + 1 < Object.keys(Color).length ? this.board.turn.value + 1 : 0]]
+                        }
+                        succes = true
+                        break
+                    }
+                }
+                if (!succes) {
+                    this.selected = this.board.grid[x][7 - y]
+                    if (this.selected != 0 && this.selected.color != this.board.turn) {
+                        this.selected = 0
+                    }
+                }
             }
             this.draw()
         }
@@ -183,10 +273,8 @@ class graphicsHandler {
 
         if (this.selected != 0) {
             for (const move of generateMoves(this.selected, this.board)) {
-                print(move)
                 x = move.x + move.dx
                 y = move.y + move.dy
-                print(x)
                 this.p.beginPath()
                 this.p.arc(s * x + s/2, (7 - y) * s + s/2, s/4, 0, 2 * Math.PI, false)
                 this.p.fillStyle = "red"

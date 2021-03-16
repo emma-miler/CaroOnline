@@ -12,6 +12,13 @@ const Color = {
     BLACK: 1
 }
 
+const Direction = {
+    HORIZONTAL: 0,
+    VERTICAL: 1,
+    DIAGONALRIGHT: 2,
+    DIAGONALLEFT: 3
+}
+
 function Move(x1, y1, dx, dy, isCapture=false, captureType=undefined, enpassantable=false, isEnPassant=false, isCastleLong=false, isCastleShort=false, isPromotion=false, promoteTo=undefined) {
     this.x = x1
     this.y = y1
