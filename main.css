@@ -1,6 +1,9 @@
+body {
+    background-color: #181a1b;
+}
+
 .board {
     height: 100%;
-    image-rendering: crisp-edges;
 }
 
 .noselect {
@@ -10,8 +13,6 @@
     user-select: none; /* Not valid CSS yet, as of July 2012 */
 
     -webkit-user-drag: none; /* Prevents dragging of images/divs etc */
-    user-drag: none;
-    pointer-events: none;
 }
 
 .piece {
@@ -26,4 +27,8 @@
 .queen {
     background: url("ChessPiecesArray.png") 0 0;
     background-size: 700% 200%;
-  }
+}
+
+.invisible {
+    display: none
+}

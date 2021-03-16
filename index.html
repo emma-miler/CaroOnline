@@ -3,9 +3,10 @@
         <link rel="stylesheet" href="main.css">
     </head>
     <body>
+        <script type="text/javascript" src="data.js"></script>
+        <script type="text/javascript" src="moveGen.js"></script>
         <script type="text/javascript" src="game.js"></script>
-        <img src="board.png" id="board" class="board noselect" ondragstart="false">
-            <div id="test" class="queen piece"></div>
-        </img>
+        <canvas id="board" class="board noselect"></canvas>
+        <img id="chesspieces" src="ChessPiecesArray.png" class="invisible">
     </body>
 </html>
