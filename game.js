@@ -233,7 +233,7 @@ class graphicsHandler {
                 // Generate moves and check if clicked square is legal
                 var attacks = this.board.calcPins()
                 for (const move of generateMoves(this.selected, this.board)) {
-                    if (x == sx + move.dx && 7 - y == sy + move.dy) {
+                    if ((!this.flipped && x == sx + move.dx && 7 - y == sy + move.dy) || (this.flipped && 7 - x == sx + move.dx && y == sy + move.dy)) {
                         if (move.isPromotion) {
                             this.drawPromotionDialog = true
                         }
@@ -383,6 +383,54 @@ window.onload = function() {
     gui = new graphicsHandler(board)
     gui.draw()
     print("LOAD COMPLETE")
+
+    console.log("tesedt124")
+    createButton = document.getElementById("create")
+    createButton.addEventListener("click", function() {
+        document.getElementById("serverScreen").style["right"] = "0"
+        document.getElementById("mainScreen").style["right"] = "100%"
+        document.getElementById("box").style["pointer-events"] = "auto"
+        document.getElementById("boxMain").style["pointer-events"] = "none"
+        start(true)
+    })
+    backServer = document.getElementById("backButtonServer")
+    backServer.addEventListener("click", function() {
+        document.getElementById("serverScreen").style["right"] = "-100%"
+        document.getElementById("mainScreen").style["right"] = "0"
+        document.getElementById("box").style["pointer-events"] = "none"
+        document.getElementById("boxMain").style["pointer-events"] = "auto"
+    })
+
+    joinButton = document.getElementById("join")
+    joinButton.addEventListener("click", function(){
+        document.getElementById("clientScreen").style["right"] = "0"
+        document.getElementById("mainScreen").style["right"] = "100%"
+        document.getElementById("box").style["pointer-events"] = "auto"
+        document.getElementById("boxMain").style["pointer-events"] = "none"
+    })
+    backJoin = document.getElementById("backButtonJoin")
+    backJoin.addEventListener("click", function() {
+        document.getElementById("clientScreen").style["right"] = "-100%"
+        document.getElementById("mainScreen").style["right"] = "0"
+        document.getElementById("box").style["pointer-events"] = "none"
+        document.getElementById("boxMain").style["pointer-events"] = "auto"
+    })
+
+    connectButton = document.getElementById("connect")
+    connectButton.addEventListener("click", function() {
+        start(false)
+    })
+
+    sendButton = document.getElementById("send")
+    sendButton.addEventListener("click", function() {
+        //document.getElementById("message").innerHTML = "testing abc"
+        document.getElementById("msg").click()
+    })
+
+    gameConnected = document.getElementById("connected")
+    gameConnected.addEventListener("click", function() {
+        document.getElementById("overlay").style["display"] = "none"
+    })
 
 }
 

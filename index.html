@@ -8,11 +8,54 @@
         </div>
         <label class="msLabel"> <input type="checkbox" class="masterSwitch" id="masterSwitch">Master Switch</label>
         <label class="flipLabel"> <input type="checkbox" class="flipSwitch" id="flipSwitch">Flip Board</label>
+        <script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js"></script>
+        <script type="text/javascript" src="server.js"></script>
+        <script type="text/javascript" src="menuHandler.js"></script>
         <script type="text/javascript" src="data.js"></script>
         <script type="text/javascript" src="moveGen.js"></script>
         <script type="text/javascript" src="game.js"></script>
         <canvas id="board" class="board noselect"></canvas>
+
+        <msg id="send" value="test123" style="display: none;"></msg>
+        <msg id="recv" value="" style="display: none;"></msg>
+        <msg id="connected" style="display: none"></msg>
+
         <button onclick="runPerformanceTest()">Run Performance Test</button>
         <img id="chesspieces" src="ChessPiecesArray.png" class="invisible">
+        <div id="overlay" class="overlay">
+            <div id="darker">
+                <div id="boxMain" class="boxMain">
+                    <div id="mainScreen" class="slideOverScreenMain">
+                        <div id="title">CaroOnline</div>
+                        <div class="container-container">
+                            <div id="mainMenu" class="flex-container">
+                                <div id="create" class="menuButton">Create game</div>
+                                <div id="join" class="menuButton">Join game</div>
+                                <div id="help" class="menuButton">Help</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="box" class="box">
+                    <div id="serverScreen" class="slideOverScreen">
+                        <div class="flex-container-server">
+                            <div id="backButtonServer" class="backButton">←</div>
+                            <div id="idLabel" class="menuText">Your ID is:</div>
+                            <div id="idText" class="idText">teasfgasdfgasffa</div>
+                            <div id="copy" class="menuButton">Copy ID</div>
+                            <div id="send" class="menuButton">Send</div>
+                        </div>
+                    </div>
+                    <div id="clientScreen" class="slideOverScreen">
+                        <div class="flex-container-server">
+                            <div id="backButtonJoin" class="backButton">←</div>
+                            <div id="idLabel" class="menuText">Input ID:</div>
+                            <div id="idText"><input class="idInput" type="text" id="client-id"></div>
+                            <div id="connect" class="menuButton">Connect</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </body>
 </html>
