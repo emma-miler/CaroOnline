@@ -1,4 +1,4 @@
-function generateMoves(self, board, ignoreCheck=false) {
+function generateMoves(self, board, ignoreCheck=false, control=true) {
     plm = []
     if (self.type == PType.PAWN) {
         var capLeft = false
@@ -11,26 +11,26 @@ function generateMoves(self, board, ignoreCheck=false) {
                 capLeft = true
             }
         }
-        calcPawn(self, plm, board, capLeft, capRight)
+        calcPawn(self, plm, board, capLeft, capRight, control)
     }
     else if (self.type == PType.ROOK) {
         if (self.pinned && (self.pinDirection == Direction.DIAGONALLEFT || self.pinDirection == Direction.DIAGONALRIGHT)) {
             return plm
         }
         else {
-            calcRook(self, plm, board)
+            calcRook(self, plm, board, control)
         }
     }
     else if (self.type == PType.QUEEN) {
-        calcBishop(self, plm, board)
-        calcRook(self, plm, board)
+        calcBishop(self, plm, board, control)
+        calcRook(self, plm, board, control)
     }
     else if (self.type == PType.BISHOP) {
         if (self.pinned && (self.pinDirection == Direction.HORIZONTAL || self.pinDirection == Direction.VERTICAL)) {
             return plm
         }
         else {
-            calcBishop(self, plm, board)
+            calcBishop(self, plm, board, control)
         }
     }
     else if (self.type == PType.KNIGHT) {
@@ -38,7 +38,7 @@ function generateMoves(self, board, ignoreCheck=false) {
             return plm
         }
         else {
-            calcKnight(self, plm, board)
+            calcKnight(self, plm, board, control)
         }
     }
     else if (self.type == PType.KING) {
@@ -47,11 +47,13 @@ function generateMoves(self, board, ignoreCheck=false) {
         for (const move of notChecked) {
             var x = move.x + move.dx
             var y = move.y + move.dy
+            // BACKUP:
+            if (false) {
+            /*
             if (self.color == Color.WHITE) {
                 // TODO: finish this
                 if (y < 7) {
                     if (6 > x > 1) {
-                        print(x)
                         var s = board.grid[x - 1][y + 1]
                         if (s != 0 && s.color != self.color && (s.type == PType.KING || s.type == PType.PAWN || s.type == PType.BISHOP)) {
                             continue
@@ -76,61 +78,117 @@ function generateMoves(self, board, ignoreCheck=false) {
                 }
                 var skipSquare = [self.x,self.y]
                 var isCheck = false
-                if (!isCheck) {
-                    // Calculate possible bishop/queen positions to check from that square
-                    var tempBishop = new Piece(PType.BISHOP, x, y, Color.WHITE)
-                    var possibleBishopLocations = []
-                    calcBishop(tempBishop, possibleBishopLocations, board, skipSquare=skipSquare)
-                    delete tempBishop
-                    for (const kp of possibleBishopLocations) {
-                        var s = board.grid[kp.x + kp.dx][kp.y + kp.dy]
-                        if (s != 0 && (s.type == PType.BISHOP || s.type==PType.QUEEN) && s.color == Color.BLACK) {
-                            isCheck = true
-                            break
+            }
+            if (self.color == Color.BLACK) {
+                // TODO: finish this
+                if (y > 7) {
+                    if (6 > x > 1) {
+                        var s = board.grid[x - 1][y - 1]
+                        if (s != 0 && s.color != self.color && (s.type == PType.KING || s.type == PType.PAWN || s.type == PType.BISHOP)) {
+                            continue
+                        }
+                        var s = board.grid[x + 1][y - 1]
+                        if (s != 0 && s.color != self.color && (s.type == PType.KING || s.type == PType.PAWN || s.type == PType.BISHOP)) {
+                            continue
+                        }
+                    }
+                    else if (x == 0) {
+                        var s = board.grid[x + 1][y - 1]
+                        if (s != 0 && s.color != self.color && (s.type == PType.KING || s.type == PType.PAWN || s.type == PType.BISHOP)) {
+                            continue
+                        }
+                    }
+                    else if (x == 7) {
+                        var s = board.grid[x - 1][y - 1]
+                        if (s != 0 && s.color != self.color && (s.type == PType.KING || s.type == PType.PAWN || s.type == PType.BISHOP)) {
+                            continue
                         }
                     }
                 }
-                if (!isCheck) {
-                    // Calculate possible rook/queen positions to check from that square
-                    var tempRook = new Piece(PType.ROOK, x, y, Color.WHITE)
-                    var possibleRookLocations = []
-                    calcRook(tempRook, possibleRookLocations, board, skipSquare=skipSquare)
-                    delete tempRook
-                    for (const kp of possibleRookLocations) {
-                        var s = board.grid[kp.x + kp.dx][kp.y + kp.dy]
-                        if (s != 0 && (s.type == PType.ROOK || s.type==PType.QUEEN) && s.color == Color.BLACK) {
-                            isCheck = true
-                            break
-                        }
+                var skipSquare = [self.x,self.y]
+                var isCheck = false
+            }
+            if (!isCheck) {
+                // Calculate possible bishop/queen positions to check from that square
+                var tempBishop = new Piece(PType.BISHOP, x, y, Color.WHITE)
+                var possibleBishopLocations = []
+                calcBishop(tempBishop, possibleBishopLocations, board, skipSquare=skipSquare)
+                delete tempBishop
+                for (const kp of possibleBishopLocations) {
+                    var s = board.grid[kp.x + kp.dx][kp.y + kp.dy]
+                    if (s != 0 && (s.type == PType.BISHOP || s.type==PType.QUEEN) && s.color == Color.BLACK) {
+                        isCheck = true
+                        break
                     }
                 }
-                if (!isCheck) {
-                    // Calculate possible knight positions to check from that square
-                    var tempKnight = new Piece(PType.KNIGHT, x, y, Color.WHITE)
-                    var possibleKnightLocation = []
-                    calcKnight(tempKnight, possibleKnightLocation, board, skipSquare=skipSquare)
-                    delete tempKnight
-                    for (const kp of possibleKnightLocation) {
-                        var s = board.grid[kp.x + kp.dx][kp.y + kp.dy]
-                        if (s != 0 && s.type == PType.KNIGHT && s.color == Color.BLACK) {
-                            isCheck = true
-                            break
-                        }
+            }
+            if (!isCheck) {
+                // Calculate possible rook/queen positions to check from that square
+                var tempRook = new Piece(PType.ROOK, x, y, Color.WHITE)
+                var possibleRookLocations = []
+                calcRook(tempRook, possibleRookLocations, board, skipSquare=skipSquare)
+                delete tempRook
+                for (const kp of possibleRookLocations) {
+                    var s = board.grid[kp.x + kp.dx][kp.y + kp.dy]
+                    if (s != 0 && (s.type == PType.ROOK || s.type==PType.QUEEN) && s.color == Color.BLACK) {
+                        isCheck = true
+                        break
                     }
                 }
-                if (isCheck) {
-                    continue
+            }
+            if (!isCheck) {
+                // Calculate possible knight positions to check from that square
+                var tempKnight = new Piece(PType.KNIGHT, x, y, Color.WHITE)
+                var possibleKnightLocation = []
+                calcKnight(tempKnight, possibleKnightLocation, board, skipSquare=skipSquare)
+                delete tempKnight
+                for (const kp of possibleKnightLocation) {
+                    var s = board.grid[kp.x + kp.dx][kp.y + kp.dy]
+                    if (s != 0 && s.type == PType.KNIGHT && s.color == Color.BLACK) {
+                        isCheck = true
+                        break
+                    }
                 }
+            }
+            if (isCheck) {
+                continue
+            }
+            plm.push(move)
+            */
+            }
+            var check = false
+            for (const controlled of board.controlled[board.turn == 0 ? 1 : 0]) {
+                if (x == controlled.x + controlled.dx && y == controlled.y + controlled.dy) {
+                    check = true
+                    print(controlled)
+                    break
+                } 
+            }
+            if (!check && move.isCastleShort) {
+                for (const controlled of board.controlled[board.turn == 0 ? 1 : 0]) {
+                    if (x-1 == controlled.x + controlled.dx && y == controlled.y + controlled.dy) {
+                        check = true
+                        break
+                    } 
+                }
+            }
+            if (!check && move.isCastleLong) {
+                for (const controlled of board.controlled[board.turn == 0 ? 1 : 0]) {
+                    if (x+1 == controlled.x + controlled.dx && y == controlled.y + controlled.dy) {
+                        check = true
+                        break
+                    } 
+                }
+            }
+
+            if (!check) {
                 plm.push(move)
             }
+            
         }
     }
-    console.log("TESTING HERE")
-    console.log(board.checks)
     if (!ignoreCheck && !(self.type == PType.KING)) {
-        console.log("TRUE 1")
         if (board.checks[board.turn]) {
-            console.log("TRUE HERe")
             var checkStop = []
             for (const move of plm) {
                 var x = move.x + move.dx
@@ -141,7 +199,7 @@ function generateMoves(self, board, ignoreCheck=false) {
                     }
                 }
                 for (const checkingPiece of board.checkPieces) {
-                    if (checkingPiece[0] == x && checkingPiece[1] == y) {
+                    if (checkingPiece.x == x && checkingPiece == y) {
                         checkStop.push(move)
                     }
                 }
@@ -156,13 +214,13 @@ function generateMoves(self, board, ignoreCheck=false) {
         return plm
     }
 }
-// TODO: fix en passant
-function calcPawn(self, plm, board, capLeft, capRight) {
+// TODO: promotion
+function calcPawn(self, plm, board, capleft, capright, control=false) {
     m = self.color == Color.WHITE ? 1 : -1
 
     // Captures
     if (self.x > 0) {
-        if (board.grid[self.x - 1][self.y + m] != 0 && board.grid[self.x - 1][self.y + m].color != self.color) {
+        if ((board.grid[self.x - 1][self.y + m] != 0 && board.grid[self.x - 1][self.y + m].color != self.color && capleft || control) && capleft) {
             if ((!self.pinned) || self.pinDirection == Direction.DIAGONALLEFT) {
                 var move = new Move(self.x, self.y, -1, m)
                 move.isCapture = true
@@ -172,14 +230,14 @@ function calcPawn(self, plm, board, capLeft, capRight) {
         }
     }
     if (self.x < 7) {
-        if (board.grid[self.x + 1][self.y + m] != 0 && board.grid[self.x + 1][self.y + m].color != self.color) {
+        if ((board.grid[self.x + 1][self.y + m] != 0 && board.grid[self.x + 1][self.y + m].color != self.color || control) && capright) {
             if ((!self.pinned) || self.pinDirection == Direction.DIAGONALRIGHT) {
                 plm.push(new Move(self.x, self.y, 1, m, isCapture=true, captureType=board.grid[self.x + 1][self.y + m].type))
             }
         }
     }
 
-    if (board.grid[self.x][self.y + m] == 0) {
+    if (board.grid[self.x][self.y + m] == 0 && !control) {
         if (self.y == (self.color == Color.WHITE ? 6 : 1)) {
             if ((!self.pinned) || self.pinDirection == Direction.VERTICAL) {
                 plm.push(new Move(self.x, self.y, 0, m, isPromotion=true, promoteTo=PType.QUEEN))
@@ -195,7 +253,7 @@ function calcPawn(self, plm, board, capLeft, capRight) {
         }
     }
     // First new Move 2 spaces
-    if (!self.hasMoved && board.grid[self.x][self.y + m] == 0 && board.grid[self.x][self.y + 2*m] == 0 && self.y == (self.color == Color.WHITE ? 1 : 6)) {
+    if (!self.hasMoved && board.grid[self.x][self.y + m] == 0 && board.grid[self.x][self.y + 2*m] == 0 && self.y == (self.color == Color.WHITE ? 1 : 6) && !control) {
         if ((!self.pinned) || self.pinDirection == Direction.VERTICAL) {
             var move = new Move(self.x, self.y, 0, 2*m)
             move.enpassantable = true
@@ -203,7 +261,7 @@ function calcPawn(self, plm, board, capLeft, capRight) {
         }
     }
     // En Passant
-    if (self.y == 4 && board.moveList.length > 0 && board.moveList[board.moveList.length - 1].enpassantable) {
+    if (self.y == 4 && board.moveList.length > 0 && board.moveList[board.moveList.length - 1].enpassantable && !control) {
         if (self.x == 0 && board.moveList[-board.moveList.length - 1].x == 1) {
             var move = new Move(self.x, self.y, 1, m)
             move.isEnPassant = true
@@ -227,7 +285,7 @@ function calcPawn(self, plm, board, capLeft, capRight) {
     }
 }
 
-function calcRook(self, plm, board, skipSquare=undefined) {
+function calcRook(self, plm, board, skipSquare=undefined, control=false) {
     var n = 7 - self.x
     var e = 7 - self.y
     var s = self.x
@@ -254,7 +312,7 @@ function calcRook(self, plm, board, skipSquare=undefined) {
             if (board.grid[self.x + x][self.y] == 0) {
                 plm.push(new Move(self.x, self.y, x, 0))
             }
-            else if (board.grid[self.x + x][self.y].color != self.color) {
+            else if (board.grid[self.x + x][self.y].color != self.color || control) {
                 var move = new Move(self.x, self.y, x, 0)
                 move.isCapture = true
                 move.captureType = captureType=board.grid[self.x + x][self.y].type
@@ -274,7 +332,7 @@ function calcRook(self, plm, board, skipSquare=undefined) {
             if (board.grid[self.x - x][self.y] == 0) {
                 plm.push(new Move(self.x, self.y, -x, 0))
             }
-            else if (board.grid[self.x - x][self.y].color != self.color) {
+            else if (board.grid[self.x - x][self.y].color != self.color || control) {
                 var move = new Move(self.x, self.y, -x, 0)
                 move.isCapture = true
                 move.captureType=board.grid[self.x - x][self.y].type
@@ -296,7 +354,7 @@ function calcRook(self, plm, board, skipSquare=undefined) {
             if (board.grid[self.x][self.y + x] == 0) {
                 plm.push(new Move(self.x, self.y, 0, x))
             }
-            else if (board.grid[self.x][self.y + x].color != self.color) {
+            else if (board.grid[self.x][self.y + x].color != self.color || control) {
                 var move = new Move(self.x, self.y, 0, x)
                 move.isCapture = true
                 move.captureType=board.grid[self.x][self.y + x].type
@@ -316,8 +374,9 @@ function calcRook(self, plm, board, skipSquare=undefined) {
             if (board.grid[self.x][self.y - x] == 0) {
                 plm.push(new Move(self.x, self.y, 0, -x))
             }
-            else if (board.grid[self.x][self.y - x].color != self.color) {
+            else if (board.grid[self.x][self.y - x].color != self.color || control) {
                 var move = new Move(self.x, self.y, 0, -x)
+                move.isCapture = true
                 move.captureType=board.grid[self.x][self.y - x].type
                 plm.push(move)
                 break
@@ -329,7 +388,7 @@ function calcRook(self, plm, board, skipSquare=undefined) {
     }
 }
 
-function calcBishop(self, plm, board, skipSquare=undefined) {
+function calcBishop(self, plm, board, skipSquare=undefined, control=false) {
     var right = true
     var left = true
     if (self.pinned) {
@@ -351,7 +410,7 @@ function calcBishop(self, plm, board, skipSquare=undefined) {
                 if (board.grid[self.x + x][self.y + x] == 0){
                     plm.push(new Move(self.x, self.y, x, x))
                 }
-                else if (board.grid[self.x + x][self.y + x].color != self.color){
+                else if (board.grid[self.x + x][self.y + x].color != self.color || control){
                     var move = new Move(self.x, self.y, x, x)
                     move.isCapture = true
                     move.captureType=board.grid[self.x + x][self.y + x].type
@@ -373,7 +432,7 @@ function calcBishop(self, plm, board, skipSquare=undefined) {
                 if (board.grid[self.x - x][self.y - x] == 0){
                     plm.push(new Move(self.x, self.y, -x, -x))
                 }
-                else if (board.grid[self.x - x][self.y - x].color != self.color){
+                else if (board.grid[self.x - x][self.y - x].color != self.color || control){
                     var move = new Move(self.x, self.y, -x, -x)
                     move.isCapture = true
                     move.captureType=board.grid[self.x - x][self.y - x].type
@@ -397,7 +456,7 @@ function calcBishop(self, plm, board, skipSquare=undefined) {
                 if (board.grid[self.x - x][self.y + x] == 0){
                     plm.push(new Move(self.x, self.y, -x, x))
                 }
-                else if (board.grid[self.x - x][self.y + x].color != self.color){
+                else if (board.grid[self.x - x][self.y + x].color != self.color || control){
                     var move = new Move(self.x, self.y, -x, x)
                     move.isCapture = true
                     move.captureType=board.grid[self.x - x][self.y + x].type
@@ -419,7 +478,7 @@ function calcBishop(self, plm, board, skipSquare=undefined) {
                 if (board.grid[self.x + x][self.y - x] == 0){
                     plm.push(new Move(self.x, self.y, x, -x))
                 }
-                else if (board.grid[self.x + x][self.y - x].color != self.color){
+                else if (board.grid[self.x + x][self.y - x].color != self.color || control){
                     var move = new Move(self.x, self.y, x, -x)
                     move.isCapture = true
                     move.captureType=board.grid[self.x + x][self.y - x].type
@@ -434,7 +493,7 @@ function calcBishop(self, plm, board, skipSquare=undefined) {
     }
 }
 
-function calcKnight(self, plm, board) {
+function calcKnight(self, plm, board, control=false) {
     if (self.x > 1) {
         if (self.y + 1 <= 7 && (board.grid[self.x - 2][self.y + 1] == 0 || board.grid[self.x - 2][self.y + 1].color != self.color)){
             plm.push(new Move(self.x, self.y, -2, 1))
@@ -469,7 +528,7 @@ function calcKnight(self, plm, board) {
     }
 }
 
-function calcKing(self, plm, board) {
+function calcKing(self, plm, board, control=false) {
     // TODO Ban castling into/through check
     var top1 = [[-1, 1], [0,1], [1,1]]
     var mid = [[-1, 0], [1,0]]
@@ -501,8 +560,10 @@ function calcKing(self, plm, board) {
         }
     }
 
+    var timer1 = window.performance.now()
+
     // Castling
-    if (!self.hasMoved) {
+    if (!self.hasMoved && !board.checks[self.color]) {
         // White
         if (self.color == Color.WHITE) {
             // Short
@@ -553,6 +614,9 @@ function calcKing(self, plm, board) {
             }
         }
     }
+
+    var timer2 = window.performance.now()
+    return timer2
 
     
 
@@ -792,7 +856,7 @@ function calcCheckDefenseSquares(board) {
             else if (move.dy != 0) {
                 // Vertical
                 //print("vertical")
-                var m = move.dx < 0 ? -1 : 1
+                var m = move.dy < 0 ? -1 : 1
                 for (var z = 1; z < Math.abs(move.dy); z++) {
                     test[a].push([move.x, move.y + (m * z)])
                 }
@@ -813,4 +877,14 @@ function calcCheckDefenseSquares(board) {
     else {
         return []
     }
+}
+
+function calcControl(color, board) {
+    var controlled = []
+    for (const piece of board.pieces) {
+        if (piece.color == color) {
+            controlled = controlled.concat(generateMoves(piece, board, control=true))
+        }
+    }
+    return controlled
 }

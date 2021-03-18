@@ -43,9 +43,9 @@ class Player {
                     new Piece(PType.ROOK, 7, 0, Color.WHITE),
                 ]
                 this.pieces = [
-                    new Piece(PType.KING, 0, 4, Color.WHITE),
-                    new Piece(PType.PAWN, 4, 4, Color.WHITE),
-                    new Piece(PType.BISHOP, 3, 4, Color.WHITE),
+                    new Piece(PType.ROOK, 0, 0, Color.WHITE),
+                    new Piece(PType.KING, 4, 0, Color.WHITE),
+                    new Piece(PType.ROOK, 7, 0, Color.WHITE),
                 ]
             }
             else if (color == Color.BLACK) {
@@ -68,8 +68,7 @@ class Player {
                     new Piece(PType.ROOK, 7, 7, Color.BLACK),
                 ]
                 this.pieces = [
-                    new Piece(PType.QUEEN, 0, 0, Color.BLACK),
-                    new Piece(PType.KNIGHT, 3, 6, Color.BLACK),
+                    new Piece(PType.QUEEN, 3, 7, Color.BLACK),
                 ]
             }
         }
@@ -87,12 +86,16 @@ class Board {
     }
 
     setup() {
-        this.turn = Color.WHITE
+        this.turn = Color.BLACK
+        this.updateBoard()
         this.checks = [false, false]
         this.checkPieces = []
-        this.checkStopSquares = []
+        this.pins = []
+        this.checkStopSquares = [[],[]]
+        this.controlled = [[], []]
+        this.moves = [[], []]
         this.moveList = []
-        this.updateBoard()
+        this.tickTurn()
     }
 
     updateBoard() {
@@ -144,6 +147,16 @@ class Board {
         piece.hasMoved = true
         this.moveList.push(move)
         this.updateBoard()
+        this.tickTurn()
+    }
+
+    tickTurn() {
+        this.turn = Color[Object.keys(Color)[this.turn + 1 < Object.keys(Color).length ? this.turn + 1 : 0]]
+        this.pins[this.turn] = this.calcPins()
+        this.controlled = [[], []]
+        this.controlled[0] = calcControl(Color.WHITE, this)
+        this.controlled[1] = calcControl(Color.BLACK, this)
+        this.checkStopSquares[this.turn] = calcCheckDefenseSquares(this)
     }
 
     removePiece(p) {
@@ -160,7 +173,7 @@ class Board {
         this.updateBoard()
     }
 
-    calcPins(self) {
+    calcPins() {
         var attacks = []
         for (const piece of this.pieces) {
             piece.pinned = false
@@ -181,12 +194,18 @@ class graphicsHandler {
         this.p = this.canvas.getContext("2d")
         this.board = board
 
+        this.ranks = ["a", "b", "c", "d", "e", "f", "g", "h"]
+
         this.lightBrush = "#FFFFFF"
         this.darkBrush = "#1a2737"
 
         this.selected = 0
 
         this.image = document.getElementById("chesspieces")
+
+        this.timer = document.getElementById('stopwatch');
+
+        this.flipped = false
 
         function lmbClick(event) {
             var xc = event.pageX + this.canvas.offsetLeft/2
@@ -203,7 +222,8 @@ class graphicsHandler {
             print(event.button)
 
             if (this.selected == 0) {
-                this.selected = this.board.grid[x][7 - y]
+                if (this.flipped) {this.selected = this.board.grid[7-x][y]}
+                else { this.selected = this.board.grid[x][7 - y] }
                 print(this.selected)
             }
             else {
@@ -220,7 +240,6 @@ class graphicsHandler {
                         else {
                             this.board.performMove(move)
                             this.selected = 0
-                            this.board.turn = Color[Object.keys(Color)[this.board.turn.value + 1 < Object.keys(Color).length ? this.board.turn.value + 1 : 0]]
                         }
                         succes = true
                         break
@@ -268,36 +287,70 @@ class graphicsHandler {
                 this.p.fillRect(s*2*x+o, s*y, s, s)
             }
         }
+        for (var x = 0; x < 8; x++) {
+            this.p.font = (s * 0.25).toString() + "px Arial"
+            this.p.fillStyle = x % 2 == 0 ? "white" : "black"
+            var posY = this.p.measureText(this.ranks[x]).actualBoundingBoxDescent
+            if (this.flipped) {
+                this.p.fillText(this.ranks[7-x], s * x + s*0.05, this.canvas.height - posY/1.25 - s*0.05)
+                this.p.fillText(x + 1, this.canvas.width - posY/1.25 - s*0.15, s * x - s*0.25 + 0.5*s)
+            }
+            else {
+                this.p.fillText(this.ranks[x], s * x + s*0.05, this.canvas.height - posY/1.25 - s*0.05)
+                this.p.fillText(8 - x, this.canvas.width - posY/1.25 - s*0.15, s * x - s*0.25 + 0.5*s)
+            }
+        }
+
+
+        if (this.selected != 0) {
+            this.p.fillStyle = "rgba(128, 0, 128, 0.5)"
+            if (this.selected.color != Color.WHITE && !this.board.godMode) {
+                this.p.fillStyle = "rgba(255, 16, 16, 0.5)"
+            }
+            if (this.flipped) {this.p.fillRect(s * (7-this.selected.x), s * this.selected.y, s, s)}
+            else {this.p.fillRect(s * this.selected.x, s * (7 - this.selected.y), s, s)}
+        }
 
         for (const piece of this.board.pieces) {
             if (piece.x >= 0 && piece.y >= 0) {
                 var source = renderSources[piece.type + 6*piece.color]
-                this.p.drawImage(this.image, source[0], source[1], 150, 150, piece.x * s, (7-piece.y) * s, s, s)
+                if (this.flipped) {this.p.drawImage(this.image, source[0], source[1], 150, 150, (7-piece.x) * s, piece.y * s, s, s)}
+                else {this.p.drawImage(this.image, source[0], source[1], 150, 150, piece.x * s, (7-piece.y) * s, s, s)}
             }
         }
 
-        var attacks = this.board.calcPins()
-
         this.p.fillStyle = "rgba(255, 32, 32, 0.5)"
-        for (const move of attacks) {
-            this.p.fillRect(s * move[0], s * (7-move[1]), s+1, s+1)
+        for (const move of this.board.pins) {
+            if (this.flipped) {this.p.fillRect(s * (7-move[0]), s * move[1], s+1, s+1)}
+            else {this.p.fillRect(s * move[0], s * (7-move[1]), s+1, s+1)}
         }
         this.p.fillStyle = "rgba(200, 150, 64, 0.75)"
-        var squares = calcCheckDefenseSquares(this.board)
-        print(squares)
-        this.board.checkStopSquares = squares
+        for (const move of this.board.checkStopSquares[this.board.turn]) {
+            if (this.flipped) {this.p.fillRect(s * (7-move[0]), s * move[1], s + 1, s + 1)}
+            else {this.p.fillRect(s * move[0], s * (7 - move[1]), s + 1, s + 1)}
+        }
 
-        for (const move of squares) {
-            this.p.fillRect(s * move[0], s * (7 - move[1]), s + 1, s + 1)
+        //var white = calcControl(Color.WHITE, this.board)
+        //var black = calcControl(Color.BLACK, this.board)
+        //this.board.controlled = [white, black]
+        this.p.fillStyle = "rgba(255, 32, 32, 0.5)"
+        for (const move of this.board.controlled[board.turn == 0 ? 1 : 0]) {
+            var x = move.x + move.dx
+            var y = move.y + move.dy
+            //this.p.fillRect(s * x, s * (7-y), s+1, s+1)
         }
 
         if (this.selected != 0) {
+            this.p.fillStyle = "rgba(128, 0, 128, 0.5)"
+            if (this.selected.color != Color.WHITE && !this.board.godMode) {
+                this.p.fillStyle = "rgba(255, 16, 16, 0.5)"
+            }
             for (const move of generateMoves(this.selected, this.board)) {
                 x = move.x + move.dx
                 y = move.y + move.dy
                 this.p.beginPath()
-                this.p.arc(s * x + s/2, (7 - y) * s + s/2, s/4, 0, 2 * Math.PI, false)
-                this.p.fillStyle = "red"
+                if (this.flipped) {this.p.arc(s * (7-x) + s/2, y * s + s/2, s/4, 0, 2 * Math.PI, false)}
+                else {this.p.arc(s * x + s/2, (7 - y) * s + s/2, s/4, 0, 2 * Math.PI, false)}
                 this.p.fill()
             }
         }
@@ -305,7 +358,23 @@ class graphicsHandler {
     }
 }
 
+function masterToggle() {
+    board.godMode = masterSwitch.checked
+    gui.draw()
+}
+
+function flipBoardButton() {
+    gui.flipped = flipSwitch.checked
+    gui.draw()
+}
+
 window.onload = function() {
+
+    masterSwitch = document.getElementById("masterSwitch")
+    masterSwitch.addEventListener("click", masterToggle)
+
+    flipSwitch = document.getElementById("flipSwitch")
+    flipSwitch.addEventListener("click", flipBoardButton)
 
     player1 = new Player("Player 1", Color.WHITE)
     player2 = new Player("Player 2", Color.BLACK)
@@ -313,6 +382,37 @@ window.onload = function() {
     board = new Board(player1, player2)
     gui = new graphicsHandler(board)
     gui.draw()
-    print("test")
+    print("LOAD COMPLETE")
 
+}
+
+function runPerformanceTest() {
+    const timer = document.getElementById('stopwatch');
+    var iter = 100
+    print("\n\n")
+    pieceTimers = [[0],[],[],[],[],[],[],[]]
+    for (const piece of board.pieces) {
+        var times = []
+        for (var x = 0; x < iter; x++) {
+            var startTime = window.performance.now()
+            moves = generateMoves(piece, board)
+            var endTime = window.performance.now()
+            times.push(endTime - startTime)
+        }
+        var total = 0
+        for(var i = 0; i < times.length; i++) {
+            total += times[i];
+        }
+        pieceTimers[piece.type].push(total/times.length)
+    }
+    for (var x = 0; x < pieceTimers.length; x++) {
+        var total = 0
+        for(var i = 0; i < pieceTimers[x].length; i++) {
+            total += pieceTimers[x][i];
+        }
+        print(Object.keys(PType)[x] + ": " + (total/pieceTimers[x].length).toString().substring(0, 5))
+    }
+    var endTime = window.performance.now()
+    timer.innerHTML = ((endTime - startTime)).toString().substring(0, 5)
+    print("\n\n")
 }

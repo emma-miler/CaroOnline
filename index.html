@@ -3,10 +3,16 @@
         <link rel="stylesheet" href="main.css">
     </head>
     <body>
+        <div id="stopwatch">
+            0
+        </div>
+        <label class="msLabel"> <input type="checkbox" class="masterSwitch" id="masterSwitch">Master Switch</label>
+        <label class="flipLabel"> <input type="checkbox" class="flipSwitch" id="flipSwitch">Flip Board</label>
         <script type="text/javascript" src="data.js"></script>
         <script type="text/javascript" src="moveGen.js"></script>
         <script type="text/javascript" src="game.js"></script>
         <canvas id="board" class="board noselect"></canvas>
+        <button onclick="runPerformanceTest()">Run Performance Test</button>
         <img id="chesspieces" src="ChessPiecesArray.png" class="invisible">
     </body>
 </html>

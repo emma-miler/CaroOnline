@@ -31,4 +31,35 @@ body {
 
 .invisible {
     display: none
+
+}
+
+.msLabel {
+    position: absolute;
+    right: 10%;
+    color: white;
+    display: block;
+    font-size: 25pt;
+}
+
+.flipLabel {
+    position: absolute;
+    top: 10%;
+    right: 10%;
+    color: white;
+    display: block;
+    font-size: 25pt;
+}
+
+input {
+    width: 25pt;
+    height: 25pt;
+}
+
+#stopwatch {
+    font-size: 100px;
+    position: absolute;
+    top: 10%;
+    right: 5%;
+    color: white;
 }
