@@ -1,5 +1,7 @@
 function print(arg) {console.log(arg)}
 
+// TODO: set up a structure so that pins, moves, etc are only calculated once per move
+
 renderSources = [
     [0.0, 0.0, 150.0, 150.0],
     [150.0, 0.0, 150.0, 150.0],
@@ -52,6 +54,10 @@ class Player {
                     new Piece(PType.KNIGHT, 6, 0, Color.WHITE),
                     new Piece(PType.ROOK, 7, 0, Color.WHITE),
                 ]
+                this.pieces = [
+                    new Piece(PType.KING, 0, 4, Color.WHITE),
+                    new Piece(PType.PAWN, 4, 4, Color.WHITE),
+                ]
             }
             else if (color == Color.BLACK) {
                 this.pieces = [
@@ -72,6 +78,10 @@ class Player {
                     new Piece(PType.KNIGHT, 6, 7, Color.BLACK),
                     new Piece(PType.ROOK, 7, 7, Color.BLACK),
                 ]
+                this.pieces = [
+                    new Piece(PType.QUEEN, 7, 4, Color.BLACK),
+                    new Piece(PType.PAWN, 1, 6, Color.BLACK),
+                ]
             }
         }
         else {
@@ -88,7 +98,7 @@ class Board {
     }
 
     setup() {
-        this.turn = Color.WHITE
+        this.turn = Color.BLACK
         this.checks = [false, false]
         this.checkPieces = []
         this.checkStopSquares = []
@@ -124,10 +134,7 @@ class Board {
         if ( move.isEnPassant) {
             this.removePiece([move.x + move.dx, move.y + move.dy - (this.turn == Color.WHITE ? 1:-1)])
         }
-        print("TESTING")
-        print(move)
         if ( move.isCastleShort) {
-            print("CASTLED SHORT!!")
             if ( piece.color == Color.WHITE) {
                 this.grid[7][0].x = 5
             }
@@ -159,10 +166,23 @@ class Board {
             }
         }
         if (typeof(y) == "number") {
-            // TODO: FIX THIS NOT WORKING
-            //this.pieces.pop(y - 1)
+            this.pieces.splice(y, 1)
         }
         this.updateBoard()
+    }
+
+    calcPins(self) {
+        var attacks = []
+        for (const piece of this.pieces) {
+            piece.pinned = false
+        }
+        for (const piece of this.pieces) {
+            if (piece.color == Color.WHITE && piece.type == PType.KING) {
+                calcRookPin(piece, attacks, this)
+                calcBishopPin(piece, attacks, this)
+            }
+        }
+        return attacks
     }
 }
 
@@ -202,6 +222,7 @@ class graphicsHandler {
                 var sy = this.selected.y
                 var succes = false
                 // Generate moves and check if clicked square is legal
+                var attacks = this.board.calcPins()
                 for (const move of generateMoves(this.selected, this.board)) {
                     if (x == sx + move.dx && 7 - y == sy + move.dy) {
                         if (move.isPromotion) {
@@ -210,7 +231,6 @@ class graphicsHandler {
                         else {
                             this.board.performMove(move)
                             this.selected = 0
-                            console.log("Turn: " + Object.keys(Color)[this.board.turn.value + 1 < Object.keys(Color).length ? this.board.turn.value + 1 : 0])
                             this.board.turn = Color[Object.keys(Color)[this.board.turn.value + 1 < Object.keys(Color).length ? this.board.turn.value + 1 : 0]]
                         }
                         succes = true
@@ -231,10 +251,6 @@ class graphicsHandler {
             this.selected = 0
             event.preventDefault()
             this.draw()
-        }
-
-        function test() {
-            alert("123")
         }
     
 
@@ -271,6 +287,8 @@ class graphicsHandler {
             }
         }
 
+        var attacks = this.board.calcPins()
+
         if (this.selected != 0) {
             for (const move of generateMoves(this.selected, this.board)) {
                 x = move.x + move.dx
@@ -281,6 +299,17 @@ class graphicsHandler {
                 this.p.fill()
             }
         }
+
+        this.p.fillStyle = "rgba(255, 32, 32, 0.5)"
+        for (const move of attacks) {
+            this.p.fillRect(s * move[0], s * (7-move[1]), s+1, s+1)
+        }
+        //qp.setBrush(QtGui.QBrush(QtGui.QColor(200, 150, 64, 200)))
+        //squares = this.calcCheckDefenseSquares()
+        //self.board.checkStopSquares = squares
+        //for (move of squares) {
+        //    qp.drawRect(s * move[0] + 9, s * (7 - move[1]) + 9, s + 1, s + 1)
+        //}
 
     }
 }
