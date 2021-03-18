@@ -342,7 +342,8 @@ class graphicsHandler {
         for (const move of this.board.controlled[board.turn == 0 ? 1 : 0]) {
             var x = move.x + move.dx
             var y = move.y + move.dy
-            //this.p.fillRect(s * x, s * (7-y), s+1, s+1)
+            if (this.flipped) {this.p.fillRect(s * (7-x), s * y, s+1, s+1)}
+            else {this.p.fillRect(s * x, s * (7-y), s+1, s+1)}
         }
 
         if (this.selected != 0) {
