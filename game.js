@@ -18,18 +18,6 @@ renderSources = [
 ]
 
 
-class Piece {
-    constructor(type, x, y, color) {
-        this.type = type
-        this.x = x
-        this.y = y
-        this.color = color
-
-        this.pinned = false
-        this.hasMoved = false
-    }
-}
-
 class Player {
     constructor(name, color, pieces=undefined) {
         this.name = name
@@ -57,6 +45,7 @@ class Player {
                 this.pieces = [
                     new Piece(PType.KING, 0, 4, Color.WHITE),
                     new Piece(PType.PAWN, 4, 4, Color.WHITE),
+                    new Piece(PType.BISHOP, 3, 4, Color.WHITE),
                 ]
             }
             else if (color == Color.BLACK) {
@@ -79,8 +68,8 @@ class Player {
                     new Piece(PType.ROOK, 7, 7, Color.BLACK),
                 ]
                 this.pieces = [
-                    new Piece(PType.QUEEN, 7, 4, Color.BLACK),
-                    new Piece(PType.PAWN, 1, 6, Color.BLACK),
+                    new Piece(PType.QUEEN, 0, 0, Color.BLACK),
+                    new Piece(PType.KNIGHT, 3, 6, Color.BLACK),
                 ]
             }
         }
@@ -98,7 +87,7 @@ class Board {
     }
 
     setup() {
-        this.turn = Color.BLACK
+        this.turn = Color.WHITE
         this.checks = [false, false]
         this.checkPieces = []
         this.checkStopSquares = []
@@ -289,6 +278,19 @@ class graphicsHandler {
 
         var attacks = this.board.calcPins()
 
+        this.p.fillStyle = "rgba(255, 32, 32, 0.5)"
+        for (const move of attacks) {
+            this.p.fillRect(s * move[0], s * (7-move[1]), s+1, s+1)
+        }
+        this.p.fillStyle = "rgba(200, 150, 64, 0.75)"
+        var squares = calcCheckDefenseSquares(this.board)
+        print(squares)
+        this.board.checkStopSquares = squares
+
+        for (const move of squares) {
+            this.p.fillRect(s * move[0], s * (7 - move[1]), s + 1, s + 1)
+        }
+
         if (this.selected != 0) {
             for (const move of generateMoves(this.selected, this.board)) {
                 x = move.x + move.dx
@@ -299,17 +301,6 @@ class graphicsHandler {
                 this.p.fill()
             }
         }
-
-        this.p.fillStyle = "rgba(255, 32, 32, 0.5)"
-        for (const move of attacks) {
-            this.p.fillRect(s * move[0], s * (7-move[1]), s+1, s+1)
-        }
-        //qp.setBrush(QtGui.QBrush(QtGui.QColor(200, 150, 64, 200)))
-        //squares = this.calcCheckDefenseSquares()
-        //self.board.checkStopSquares = squares
-        //for (move of squares) {
-        //    qp.drawRect(s * move[0] + 9, s * (7 - move[1]) + 9, s + 1, s + 1)
-        //}
 
     }
 }

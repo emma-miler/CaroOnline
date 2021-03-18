@@ -33,3 +33,15 @@ function Move(x1, y1, dx, dy, isCapture=false, captureType=undefined, enpassanta
     this.isPromotion = isPromotion
     this.promoteTo = promoteTo
 }
+
+class Piece {
+    constructor(type, x, y, color) {
+        this.type = type
+        this.x = x
+        this.y = y
+        this.color = color
+
+        this.pinned = false
+        this.hasMoved = false
+    }
+}

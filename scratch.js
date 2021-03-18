@@ -1,87 +1,84 @@
-function calcBishopPin(self, pinnedSquares, board) {
-    for (var x = 1; x<8; x++) {
-        if (self.x + x <= 7 && self.y + x <= 7) {
-            if (board.grid[self.x + x][self.y + x] != 0 && board.grid[self.x + x][self.y + x].color != self.color && (board.grid[self.x + x][self.y + x].type == PType.QUEEN or board.grid[self.x + x][self.y + x].type == PType.BISHOP)) {
-                var counter0
-                var temp = []
-                for (var z = 1; z < x; z++) {
-                    if (board.grid[self.x + z][self.y + z] != 0) {
-                        counter += 1
-                        if (board.grid[self.x + z][self.y + z].color == self.color) {
-                            temp.append(board.grid[self.x + z][self.y + z])
+function calcCheckDefenseSquares(self, board) {
+        var test = []
+        var checks = []
+        var next = Color[Object.keys(Color)[this.board.turn.value + 1 < Object.keys(Color).length ? this.board.turn.value + 1 : 0]]
+        if (!self.board.checks[next.value]) {
+            for (const piece of self.board.pieces) {
+                if (piece.color == next) {
+                    pieceMoves =  piece.generatePseudoLegalMoves(self.board, ignoreCheck=true)
+                    for (const move of pieceMoves) {
+                        if (move.isCapture && move.captureType == PType.KING) {
+                            checks.push(move)
                         }
                     }
                 }
-                if (counter == 1 && len(temp) > 0) {
-                    temp[0].pinned = True
-                    temp[0].pinDirection = Direction.DIAGONALRIGHT
-                    pinnedSquares.append([temp[0].x, temp[0].y])
-                }
             }
-        }
-    }
-    for (var x = 1; x<8; x++) {
-        if (self.x - x >= 0 && self.y - x >= 0) {
-            if (board.grid[self.x - x][self.y - x] != 0 && board.grid[self.x - x][self.y - x].color != self.color && (board.grid[self.x - x][self.y - x].type == PType.QUEEN or board.grid[self.x - x][self.y - x].type == PType.BISHOP)) {
-                var counter0
-                var temp = []
-                for (var z = 1; z < x; z++) {
-                    if (board.grid[self.x - z][self.y - z] != 0) {
-                        counter += 1
-                        if (board.grid[self.x - z][self.y - z].color == self.color) {
-                            temp.append(board.grid[self.x - z][self.y - z])
+            if (len(checks) > 0) {
+                self.board.checks[self.board.turn.value] = true
+            }
+            for (const a of range(len(checks))) {
+                move = checks[a]
+                test.push([])
+                if (move.dx != 0 && move.dy != 0) {
+                    // Diagonal
+                    //print("diagonal")
+                    if (move.dx > 0 && move.dy > 0) {
+                        // Up Right
+                        for (var z = 1; z < move.dx; z++) {
+                            test[a].push([move.x + z, move.y + z])
+                        }
+                    }
+                    else if (move.dx < 0 && move.dy < 0) {
+                        // Down Left
+                        for (var z = 1; z < abs(move.dx); z++) {
+                            test[a].push([move.x - z, move.y - z])
+                        }
+                    }
+                    else if (move.dx > 0 && move.dy < 0) {
+                        // Down Right
+                        for (var z = 1; z < abs(move.dx); z++) {
+                            test[a].push([move.x + z, move.y - z])
+                        }
+                    }
+                    else if (move.dx < 0 && move.dy > 0) {
+                        // Up Left
+                        for (var z = 1; z < abs(move.dx); z++) {
+                            test[a].push([move.x - z, move.y + z])
                         }
                     }
                 }
-                if (counter == 1 && len(temp) > 0) {
-                    temp[0].pinned = True
-                    temp[0].pinDirection = Direction.DIAGONALRIGHT
-                    pinnedSquares.append([temp[0].x, temp[0].y])
-                }
-            }
-        }
-    }
-    for (var x = 1; x<8; x++) {
-        if (self.x - x >= 0 && self.y + x <= 7) {
-            if (board.grid[self.x - x][self.y + x] != 0 && board.grid[self.x - x][self.y + x].color != self.color && (board.grid[self.x - x][self.y + x].type == PType.QUEEN or board.grid[self.x - x][self.y + x].type == PType.BISHOP)) {
-                var counter0
-                var temp = []
-                for (var z = 1; z < x; z++) {
-                    if (board.grid[self.x - z][self.y + z] != 0) {
-                        counter += 1
-                        if (board.grid[self.x - z][self.y + z].color == self.color) {
-                            temp.append(board.grid[self.x - z][self.y + z])
-                        }
+                else if (move.dx != 0) {
+                    // Horizontal) {
+                    //print("horizontal")
+                    var m = move.dx < 0 ? -1 : 1
+                    for (const z of range(1, abs(move.dx))) {
+                        test[a].push([move.x + (m * z), move.y])
                     }
                 }
-                if (counter == 1 && len(temp) > 0) {
-                    temp[0].pinned = True
-                    temp[0].pinDirection = Direction.DIAGONALLEFT
-                    pinnedSquares.append([temp[0].x, temp[0].y])
-                }
-            }
-        }
-    }
-    for (var x = 1; x<8; x++) {
-        if (self.x + x <= 7 && self.y - x >= 0) {
-            if (board.grid[self.x + x][self.y - x] != 0 && board.grid[self.x + x][self.y - x].color != self.color && (board.grid[self.x + x][self.y - x].type == PType.QUEEN or board.grid[self.x + x][self.y - x].type == PType.BISHOP)) {
-                var counter0
-                var temp = []
-                for (var z = 1; z < x; z++) {
-                    if (board.grid[self.x + z][self.y - z] != 0) {
-                        counter += 1
-                        if (board.grid[self.x + z][self.y - z].color == self.color) {
-                            temp.append(board.grid[self.x + z][self.y - z])
-                        }
+                else if (move.dy != 0) {
+                    // Vertical
+                    //print("vertical")
+                    var m = move.dx < 0 ? -1 : 1
+                    for (const z of range(1, abs(move.dy))) {
+                        test[a].push([move.x, move.y + (m * z)])
                     }
                 }
-                if (counter == 1 && len(temp) > 0) {
-                    temp[0].pinned = True
-                    temp[0].pinDirection = Direction.DIAGONALLEFT
-                    pinnedSquares.append([temp[0].x, temp[0].y])
-
+            }
+            if (checks.length > 1) {
+                return []
+            }
+            else {
+                var defenseSquares= []
+                for (const x of test) {
+                    for (const move of x) {
+                        defenseSquares.push(move)
+                    }
+                self.board.checkPieces = checks
+                return defenseSquares
                 }
             }
         }
-    }
+        else {
+            return []
+        }
 }
