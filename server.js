@@ -13,7 +13,7 @@ function start(isServer) {
     var message = document.getElementById("message");
     var sendMessageBox = document.getElementById("sendMessageBox");
     var sendMessage = document.getElementById("send");
-    var recvMessage = document.getElementById("send");
+    var recvMessage = document.getElementById("recv");
     var game = document.getElementById("connected");
 
     /**
@@ -132,8 +132,8 @@ function start(isServer) {
         });
         // Handle incoming data (messages only since this is the signal sender)
         conn.on('data', function (data) {
-            addMessage("<span class=\"peerMsg\">Peer:</span> " + data);
-            console.log("test123")
+            recvMessage.setAttribute("value", data)
+            recvMessage.click()
         });
         conn.on('close', function () {
             status.innerHTML = "Connection closed";
@@ -171,7 +171,7 @@ function start(isServer) {
             };
             console.log("data")
             console.log(data)
-            recvMessage.innerHTML = data
+            recvMessage.setAttribute("value", data)
             recvMessage.click()
         });
         conn.on('close', function () {
@@ -232,7 +232,8 @@ function start(isServer) {
     sendMessage.addEventListener('click', function () {
         console.log("TEST12323423423423")
         if (conn && conn.open) {
-            var msg = "test123"; //customMessage.value;
+            console.log(sendMessage.getAttribute("value"))
+            var msg = sendMessage.getAttribute("value"); //customMessage.value;
             //message.value = "";
             conn.send(msg);
             console.log("Sent: " + msg)

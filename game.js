@@ -114,7 +114,7 @@ class Board {
         }
     }
 
-    performMove(move) {
+    performMove(move, fromOther=false) {
         var piece = this.grid[move.x][move.y]
         var newSquare = this.grid[move.x + move.dx][move.y + move.dy]
         if ( move.isPromotion) {
@@ -148,6 +148,11 @@ class Board {
         this.moveList.push(move)
         this.updateBoard()
         this.tickTurn()
+
+        if (!fromOther) {
+            sendMessage.setAttribute("value", JSON.stringify(move))
+            sendMessage.click()
+        }
     }
 
     tickTurn() {
@@ -384,7 +389,20 @@ window.onload = function() {
     gui.draw()
     print("LOAD COMPLETE")
 
-    console.log("tesedt124")
+    counter = 0
+
+    sendMessage = document.getElementById("send");
+    recvMessage = document.getElementById("recv");
+    recvMessage.addEventListener("click", function() {
+        var message = recvMessage.getAttribute("value")
+        print(JSON.parse(message))
+        print("COUNTER::::::" + counter)
+        counter++
+        board.performMove(JSON.parse(message), fromOther=true)
+        gui.draw()
+    } )
+    game = document.getElementById("connected");
+
     createButton = document.getElementById("create")
     createButton.addEventListener("click", function() {
         document.getElementById("serverScreen").style["right"] = "0"
@@ -419,12 +437,6 @@ window.onload = function() {
     connectButton = document.getElementById("connect")
     connectButton.addEventListener("click", function() {
         start(false)
-    })
-
-    sendButton = document.getElementById("send")
-    sendButton.addEventListener("click", function() {
-        //document.getElementById("message").innerHTML = "testing abc"
-        document.getElementById("msg").click()
     })
 
     gameConnected = document.getElementById("connected")
