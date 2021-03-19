@@ -1,6 +1,6 @@
 function print(arg) {console.log(arg)}
 
-// TODO: set up a structure so that pins, moves, etc are only calculated once per move
+// TODO: implement some master signals for debugging
 
 renderSources = [
     [0.0, 0.0, 150.0, 150.0],
@@ -22,6 +22,7 @@ class Player {
     constructor(name, color, pieces=undefined) {
         this.name = name
         this.color = color
+        this.taken = []
         if (pieces == undefined) {
             if (color == Color.WHITE) {
                 this.pieces = [
@@ -40,11 +41,6 @@ class Player {
                     new Piece(PType.KING, 4, 0, Color.WHITE),
                     new Piece(PType.BISHOP, 5, 0, Color.WHITE),
                     new Piece(PType.KNIGHT, 6, 0, Color.WHITE),
-                    new Piece(PType.ROOK, 7, 0, Color.WHITE),
-                ]
-                this.pieces = [
-                    new Piece(PType.ROOK, 0, 0, Color.WHITE),
-                    new Piece(PType.KING, 4, 0, Color.WHITE),
                     new Piece(PType.ROOK, 7, 0, Color.WHITE),
                 ]
             }
@@ -67,9 +63,6 @@ class Player {
                     new Piece(PType.KNIGHT, 6, 7, Color.BLACK),
                     new Piece(PType.ROOK, 7, 7, Color.BLACK),
                 ]
-                this.pieces = [
-                    new Piece(PType.QUEEN, 3, 7, Color.BLACK),
-                ]
             }
         }
         else {
@@ -83,6 +76,7 @@ class Board {
         this.players = [player1, player2]
         this.pieces = player1.pieces.concat(player2.pieces) 
         this.setup()
+        this.isOffline = true
     }
 
     setup() {
@@ -150,7 +144,7 @@ class Board {
         this.updateBoard()
         this.tickTurn()
 
-        if (!fromOther) {
+        if (!fromOther && !this.isOffline) {
             connection.send(JSON.stringify(move))
         }
         gui.draw()
@@ -176,6 +170,16 @@ class Board {
         if (typeof(y) == "number") {
             this.pieces.splice(y, 1)
         }
+        for (var x = 0; x < this.players[piece.color].pieces.length; x++) {
+            if (this.players[piece.color].pieces[x] == piece) {
+                y = x
+            }
+        }
+        if (typeof(y) == "number") {
+            this.players[piece.color].pieces.splice(y, 1)
+        }
+        this.players[p.color == 0 ? 1 : 0].taken.push(piece.type)
+        print(this.players)
         this.updateBoard()
     }
 
@@ -211,19 +215,40 @@ class graphicsHandler {
 
         this.timer = document.getElementById('stopwatch');
 
+        this.boardScale = 0.9
+
         this.flipped = false
 
-        function lmbClick(event) {
-            var xc = event.pageX + this.canvas.offsetLeft/2
-            var yc = event.pageY + this.canvas.offsetTop/2
+        function moveTest(event) {
+            this.draw()
+            this.p.fillStyle = "red"
+            var vo = ((1-this.boardScale)*window.innerHeight) / 2
+            var xc = event.pageX
+            var yc = event.pageY - vo
     
             var h = this.canvas.width
-            var s = h/8
+            var s = (h/8) * this.boardScale
+            
+            var x = Math.floor(xc / s)
+            var y = Math.floor(yc / s)
+            this.p.fillRect(x*s, y*s + vo, s, s)
+            this.p.fillStyle = "green"
+            this.p.fillRect(event.pageX, event.pageY, s/4, s/4)
+        }
+
+        function lmbClick(event) {
+            var vo = ((1-this.boardScale)*window.innerHeight) / 2
+            var xc = event.pageX
+            var yc = event.pageY - vo
+    
+            var h = this.canvas.width
+            var s = (h/8) * this.boardScale
             
             var x = Math.floor(xc / s)
             var y = Math.floor(yc / s)
     
             print("Click: " + x + " " + y)
+            print(event.pageX + " " + event.pageY)
     
             print(event.button)
 
@@ -270,6 +295,9 @@ class graphicsHandler {
 
         this.canvas.addEventListener("click", lmbClick.bind(this), false)
         this.canvas.addEventListener("contextmenu", rmbClick.bind(this), false)
+
+        //this.canvas.addEventListener("mousemove", moveTest.bind(this), false)
+
         window.addEventListener("resize", this.draw.bind(this), false)
 
     }
@@ -279,18 +307,23 @@ class graphicsHandler {
         let h = window.innerHeight
         this.canvas.height = h
         this.canvas.width = h
-        var s = h/8
+        var bh = h-((1-this.boardScale)*h)
+        var s = bh/8
+        var vo = ((1-this.boardScale)*h) / 2
         var o = 0
         var sp = 60 / s
 
-        this.p.fillStyle = this.lightBrush;
+        this.p.fillStyle = "rgba(40, 40, 40, 1)"
         this.p.fillRect(0, 0, h, h)
+
+        this.p.fillStyle = this.lightBrush;
+        this.p.fillRect(0, vo, bh, bh)
         for (var x = 0; x < 4; x++) {
             for (var y = 0; y < 8; y++) {
                 if (y % 2 == 0){ o = s; }
                 else { o = 0; }
                 this.p.fillStyle = this.darkBrush
-                this.p.fillRect(s*2*x+o, s*y, s, s)
+                this.p.fillRect(s*2*x+o, s*y + vo, s, s)
             }
         }
         for (var x = 0; x < 8; x++) {
@@ -298,12 +331,12 @@ class graphicsHandler {
             this.p.fillStyle = x % 2 == 0 ? "white" : "black"
             var posY = this.p.measureText(this.ranks[x]).actualBoundingBoxDescent
             if (this.flipped) {
-                this.p.fillText(this.ranks[7-x], s * x + s*0.05, this.canvas.height - posY/1.25 - s*0.05)
-                this.p.fillText(x + 1, this.canvas.width - posY/1.25 - s*0.15, s * x - s*0.25 + 0.5*s)
+                this.p.fillText(this.ranks[7-x], s * x + s*0.05, this.canvas.height - posY/1.25 - s*0.05 - vo)
+                this.p.fillText(x + 1, this.canvas.width - posY/1.25 - s*0.15 - 2*vo, s * x - s*0.25 + 0.5*s + vo)
             }
             else {
-                this.p.fillText(this.ranks[x], s * x + s*0.05, this.canvas.height - posY/1.25 - s*0.05)
-                this.p.fillText(8 - x, this.canvas.width - posY/1.25 - s*0.15, s * x - s*0.25 + 0.5*s)
+                this.p.fillText(this.ranks[x], s * x + s*0.05, this.canvas.height - posY/1.25 - s*0.05 - vo)
+                this.p.fillText(8 - x, this.canvas.width - posY/1.25 - s*0.15 - 2*vo, s * x - s*0.25 + 0.5*s + vo)
             }
         }
 
@@ -313,27 +346,27 @@ class graphicsHandler {
             if (this.selected.color != Color.WHITE && !this.board.godMode) {
                 this.p.fillStyle = "rgba(255, 16, 16, 0.5)"
             }
-            if (this.flipped) {this.p.fillRect(s * (7-this.selected.x), s * this.selected.y, s, s)}
-            else {this.p.fillRect(s * this.selected.x, s * (7 - this.selected.y), s, s)}
+            if (this.flipped) {this.p.fillRect(s * (7-this.selected.x), s * this.selected.y + vo, s, s)}
+            else {this.p.fillRect(s * this.selected.x, s * (7 - this.selected.y) + vo, s, s)}
         }
 
         for (const piece of this.board.pieces) {
             if (piece.x >= 0 && piece.y >= 0) {
                 var source = renderSources[piece.type + 6*piece.color]
-                if (this.flipped) {this.p.drawImage(this.image, source[0], source[1], 150, 150, (7-piece.x) * s, piece.y * s, s, s)}
-                else {this.p.drawImage(this.image, source[0], source[1], 150, 150, piece.x * s, (7-piece.y) * s, s, s)}
+                if (this.flipped) {this.p.drawImage(this.image, source[0], source[1], 150, 150, (7-piece.x) * s, piece.y * s + vo, s, s)}
+                else {this.p.drawImage(this.image, source[0], source[1], 150, 150, piece.x * s, (7-piece.y) * s + vo, s, s)}
             }
         }
 
         this.p.fillStyle = "rgba(255, 32, 32, 0.5)"
         for (const move of this.board.pins) {
-            if (this.flipped) {this.p.fillRect(s * (7-move[0]), s * move[1], s+1, s+1)}
-            else {this.p.fillRect(s * move[0], s * (7-move[1]), s+1, s+1)}
+            if (this.flipped) {this.p.fillRect(s * (7-move[0]), s * move[1] + vo, s+1, s+1)}
+            else {this.p.fillRect(s * move[0], s * (7-move[1]) + vo, s+1, s+1)}
         }
         this.p.fillStyle = "rgba(200, 150, 64, 0.75)"
         for (const move of this.board.checkStopSquares[this.board.turn]) {
-            if (this.flipped) {this.p.fillRect(s * (7-move[0]), s * move[1], s + 1, s + 1)}
-            else {this.p.fillRect(s * move[0], s * (7 - move[1]), s + 1, s + 1)}
+            if (this.flipped) {this.p.fillRect(s * (7-move[0]), s * move[1] + vo, s + 1, s + 1)}
+            else {this.p.fillRect(s * move[0], s * (7 - move[1]) + vo, s + 1, s + 1)}
         }
 
         //var white = calcControl(Color.WHITE, this.board)
@@ -343,8 +376,8 @@ class graphicsHandler {
         for (const move of this.board.controlled[board.turn == 0 ? 1 : 0]) {
             var x = move.x + move.dx
             var y = move.y + move.dy
-            if (this.flipped) {this.p.fillRect(s * (7-x), s * y, s+1, s+1)}
-            else {this.p.fillRect(s * x, s * (7-y), s+1, s+1)}
+            if (this.flipped) {this.p.fillRect(s * (7-x), s * y + vo, s+1, s+1)}
+            else {this.p.fillRect(s * x, s * (7-y) + vo, s+1, s+1)}
         }
 
         if (this.selected != 0) {
@@ -356,12 +389,83 @@ class graphicsHandler {
                 x = move.x + move.dx
                 y = move.y + move.dy
                 this.p.beginPath()
-                if (this.flipped) {this.p.arc(s * (7-x) + s/2, y * s + s/2, s/4, 0, 2 * Math.PI, false)}
-                else {this.p.arc(s * x + s/2, (7 - y) * s + s/2, s/4, 0, 2 * Math.PI, false)}
+                if (this.flipped) {this.p.arc(s * (7-x) + s/2, y * s + s/2 + vo, s/4, 0, 2 * Math.PI, false)}
+                else {this.p.arc(s * x + s/2, (7 - y) * s + s/2 + vo, s/4, 0, 2 * Math.PI, false)}
                 this.p.fill()
             }
         }
 
+        var adv = 0
+        for(var i = 0; i < this.board.players[0].taken.length; i++) {
+            adv += PValues[this.board.players[0].taken[i]];
+        }
+        for(var i = 0; i < this.board.players[1].taken.length; i++) {
+            adv -= PValues[this.board.players[1].taken[i]];
+        }
+        print("ADV:")
+        print(adv)
+
+        if (this.flipped) {
+            this.p.fillStyle = "black"
+            var t = (1-this.boardScale) * h / 2.5
+            this.p.fillRect(0, h-vo + t/4, t, t)
+            this.p.fillStyle = "white"
+            this.p.fillText("Player BLACK", t*1.25, h-vo + t)
+            var so = this.p.measureText("Player BLACK").actualBoundingBoxRight
+            for (var x = 0; x < this.board.players[1].taken.length; x++) {
+                var piece = this.board.players[1].taken[x]
+                var source = renderSources[piece]
+                this.p.drawImage(this.image, source[0], source[1], 150, 150, so + 1.5*t + (t*0.75)*x, h-vo + t/4, t, t)
+            }
+
+            this.p.fillStyle = "white"
+            var t = (1-this.boardScale) * h / 2.5
+            this.p.fillRect(0, 0, t, t)
+            this.p.fillStyle = "white"
+            this.p.fillText("Player WHITE", t*1.25, vo - t/2.5)
+            for (var x = 0; x < this.board.players[0].taken.length; x++) {
+                var piece = this.board.players[0].taken[x]
+                var source = renderSources[piece + 6]
+                this.p.drawImage(this.image, source[0], source[1], 150, 150, so + 1.5*t + (t*0.75)*x, 0, t, t)
+            }
+            if (adv > 0) {
+                this.p.fillText("+ " + adv.toString(), so + 1.75*t + (t*0.75)*this.board.players[0].taken.length, vo - t/2.5)
+            }
+            else if (adv < 0) {
+                this.p.fillText(adv.toString().replace("-", "+ "), so + 1.75*t + (t*0.75)*this.board.players[1].taken.length, h-vo + t)
+            }
+        }
+        else {
+            this.p.fillStyle = "white"
+            var t = (1-this.boardScale) * h / 2.5
+            this.p.fillRect(0, h-vo + t/4, t, t)
+            this.p.fillStyle = "white"
+            this.p.fillText("Player WHITE", t*1.25, h-vo + t)
+            var so = this.p.measureText("Player WHITE").actualBoundingBoxRight
+            for (var x = 0; x < this.board.players[0].taken.length; x++) {
+                var piece = this.board.players[0].taken[x]
+                var source = renderSources[piece + 6]
+                this.p.drawImage(this.image, source[0], source[1], 150, 150, so + 1.5*t + (t*0.75)*x, h-vo + t/6, t, t)
+            }
+
+            this.p.fillStyle = "black"
+            var t = (1-this.boardScale) * h / 2.5
+            this.p.fillRect(0, 0, t, t)
+            this.p.fillStyle = "white"
+            this.p.fillText("Player BLACK", t*1.25, vo - t/2.5)
+            for (var x = 0; x < this.board.players[1].taken.length; x++) {
+                var piece = this.board.players[1].taken[x]
+                var source = renderSources[piece]
+                this.p.drawImage(this.image, source[0], source[1], 150, 150, so + 1.5*t + (t*0.75)*x, 0, t, t)
+            }
+
+            if (adv > 0) {
+                this.p.fillText("+ " + adv.toString(), so + 1.75*t + (t*0.75)*this.board.players[0].taken.length, h-vo + t)
+            }
+            else if (adv < 0) {
+                this.p.fillText(adv.toString().replace("-", "+ "), so + 1.75*t + (t*0.75)*this.board.players[1].taken.length, vo - t/2.5)
+            }
+        }
     }
 }
 
@@ -463,6 +567,8 @@ window.onload = function() {
         document.getElementById("mainScreen").style["right"] = "100%"
         document.getElementById("box").style["pointer-events"] = "auto"
         document.getElementById("boxMain").style["pointer-events"] = "none"
+        connection = new Client(board)
+        connection.init()
     })
     backJoin = document.getElementById("backButtonJoin")
     backJoin.addEventListener("click", function() {
@@ -474,10 +580,14 @@ window.onload = function() {
 
     connectButton = document.getElementById("connect")
     connectButton.addEventListener("click", function() {
-        connection = new Client(board)
-        connection.init()
         setTimeout(function() {connection.join()}.bind(connection), 100)
         console.log(connection)
+    })
+
+    offlineButton = document.getElementById("offline")
+    offlineButton.addEventListener("click", function() {
+        document.getElementById("overlay").style["display"] = "none"
+        board.isOffline = true
     })
 }
 

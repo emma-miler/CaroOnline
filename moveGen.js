@@ -1,14 +1,14 @@
-function generateMoves(self, board, ignoreCheck=false, control=true) {
+function generateMoves(self, board, ignoreCheck=false, control=false) {
     plm = []
     if (self.type == PType.PAWN) {
-        var capLeft = false
-        var capRight = false
+        var capLeft = true
+        var capRight = true
         if (self.pinned) {
             if (self.pinDirection == Direction.DIAGONALRIGHT) {
-                capRight = true
+                capRight = false
             }
             if (self.pinDirection == Direction.DIAGONALLEFT) {
-                capLeft = true
+                capLeft = false
             }
         }
         calcPawn(self, plm, board, capLeft, capRight, control)
@@ -160,7 +160,6 @@ function generateMoves(self, board, ignoreCheck=false, control=true) {
             for (const controlled of board.controlled[board.turn == 0 ? 1 : 0]) {
                 if (x == controlled.x + controlled.dx && y == controlled.y + controlled.dy) {
                     check = true
-                    print(controlled)
                     break
                 } 
             }
@@ -232,11 +231,13 @@ function calcPawn(self, plm, board, capleft, capright, control=false) {
     if (self.x < 7) {
         if ((board.grid[self.x + 1][self.y + m] != 0 && board.grid[self.x + 1][self.y + m].color != self.color || control) && capright) {
             if ((!self.pinned) || self.pinDirection == Direction.DIAGONALRIGHT) {
-                plm.push(new Move(self.x, self.y, 1, m, isCapture=true, captureType=board.grid[self.x + 1][self.y + m].type))
+                var move = new Move(self.x, self.y, 1, m)
+                move.isCapture = true
+                move.captureType = captureType=board.grid[self.x + 1][self.y + m].type
+                plm.push(move)
             }
         }
     }
-
     if (board.grid[self.x][self.y + m] == 0 && !control) {
         if (self.y == (self.color == Color.WHITE ? 6 : 1)) {
             if ((!self.pinned) || self.pinDirection == Direction.VERTICAL) {
@@ -883,7 +884,7 @@ function calcControl(color, board) {
     var controlled = []
     for (const piece of board.pieces) {
         if (piece.color == color) {
-            controlled = controlled.concat(generateMoves(piece, board, control=true))
+            controlled = controlled.concat(generateMoves(piece, board, ignoreCheck=false, control=true))
         }
     }
     return controlled
