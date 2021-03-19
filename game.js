@@ -38,7 +38,7 @@ class Player {
                     new Piece(PType.KNIGHT, 1, 0, Color.WHITE),
                     new Piece(PType.BISHOP, 2, 0, Color.WHITE),
                     new Piece(PType.QUEEN, 3, 0, Color.WHITE),
-                    new Piece(PType.KING, 4, 0, Color.WHITE),
+                    new Piece(PType.KING, 4, 3, Color.WHITE),
                     new Piece(PType.BISHOP, 5, 0, Color.WHITE),
                     new Piece(PType.KNIGHT, 6, 0, Color.WHITE),
                     new Piece(PType.ROOK, 7, 0, Color.WHITE),
@@ -589,11 +589,15 @@ window.onload = function() {
         document.getElementById("overlay").style["display"] = "none"
         board.isOffline = true
     })
+    
+    //document.getElementById("overlay").style["display"] = "none"
+    //board.isOffline = true
 }
 
 function runPerformanceTest() {
     const timer = document.getElementById('stopwatch');
-    var iter = 100
+    var initTime = window.performance.now()
+    var iter = 10000
     print("\n\n")
     pieceTimers = [[0],[],[],[],[],[],[],[]]
     for (const piece of board.pieces) {
@@ -615,9 +619,22 @@ function runPerformanceTest() {
         for(var i = 0; i < pieceTimers[x].length; i++) {
             total += pieceTimers[x][i];
         }
-        print(Object.keys(PType)[x] + ": " + (total/pieceTimers[x].length).toString().substring(0, 5))
+        print(Object.keys(PType)[x] + ": " + (total/pieceTimers[x].length * 1000).toString().substring(0, 5))
     }
     var endTime = window.performance.now()
-    timer.innerHTML = ((endTime - startTime)).toString().substring(0, 5)
+    timer.innerHTML = ((endTime - initTime)).toString().substring(0, 5)
+    print("\n\n")
+}
+
+function runPerformanceTest1() {
+    const timer = document.getElementById('stopwatch');
+    var initTime = window.performance.now()
+    var iter = 100000
+    const piece = board.grid[4][3]
+    for (var x = 0; x < iter; x++) {
+        generateMoves(piece, board)
+    }
+    var endTime = window.performance.now()
+    timer.innerHTML = ((endTime - initTime)/iter * 1000).toString().substring(0, 5)
     print("\n\n")
 }
