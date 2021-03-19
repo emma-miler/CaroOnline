@@ -115,6 +115,7 @@ class Board {
     }
 
     performMove(move, fromOther=false) {
+        print("PERFORMMOVE")
         var piece = this.grid[move.x][move.y]
         var newSquare = this.grid[move.x + move.dx][move.y + move.dy]
         if ( move.isPromotion) {
@@ -150,9 +151,9 @@ class Board {
         this.tickTurn()
 
         if (!fromOther) {
-            sendMessage.setAttribute("value", JSON.stringify(move))
-            sendMessage.click()
+            connection.send(JSON.stringify(move))
         }
+        gui.draw()
     }
 
     tickTurn() {
@@ -389,10 +390,9 @@ window.onload = function() {
     gui = new graphicsHandler(board)
     gui.draw()
     print("LOAD COMPLETE")
+    connection = undefined
 
-    counter = 0
-
-    sendMessage = document.getElementById("send");
+    /*sendMessage = document.getElementById("send");
     recvMessage = document.getElementById("recv");
     recvMessage.addEventListener("click", function() {
         var message = recvMessage.getAttribute("value")
@@ -402,7 +402,7 @@ window.onload = function() {
         board.performMove(JSON.parse(message), fromOther=true)
         gui.draw()
     } )
-    game = document.getElementById("connected");
+    game = document.getElementById("connected");*/
 
     createButton = document.getElementById("create")
     createButton.addEventListener("click", function() {
@@ -410,8 +410,16 @@ window.onload = function() {
         document.getElementById("mainScreen").style["right"] = "100%"
         document.getElementById("box").style["pointer-events"] = "auto"
         document.getElementById("boxMain").style["pointer-events"] = "none"
-        start(true)
+        connection = new Server(board)
+        connection.init()
+        console.log(connection)
     })
+
+    copyButton = document.getElementById("copy")
+    copyButton.addEventListener("click", function() {
+        navigator.clipboard.writeText(document.getElementById("idText").innerHTML)
+    })
+
     backServer = document.getElementById("backButtonServer")
     backServer.addEventListener("click", function() {
         document.getElementById("serverScreen").style["right"] = "-100%"
@@ -437,12 +445,10 @@ window.onload = function() {
 
     connectButton = document.getElementById("connect")
     connectButton.addEventListener("click", function() {
-        start(false)
-    })
-
-    gameConnected = document.getElementById("connected")
-    gameConnected.addEventListener("click", function() {
-        document.getElementById("overlay").style["display"] = "none"
+        connection = new Client(board)
+        connection.init()
+        setTimeout(function() {connection.join()}.bind(connection), 100)
+        console.log(connection)
     })
 
 }
