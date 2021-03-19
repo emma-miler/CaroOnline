@@ -406,14 +406,42 @@ window.onload = function() {
 
     createButton = document.getElementById("create")
     createButton.addEventListener("click", function() {
-        document.getElementById("serverScreen").style["right"] = "0"
+        document.getElementById("createScreen").style["right"] = "0"
         document.getElementById("mainScreen").style["right"] = "100%"
+        document.getElementById("box").style["pointer-events"] = "auto"
+        document.getElementById("boxMain").style["pointer-events"] = "none"
+    })
+
+    backCreate = document.getElementById("backButtonServer")
+    backCreate.addEventListener("click", function() {
+        document.getElementById("serverScreen").style["right"] = "-100%"
+        document.getElementById("mainScreen").style["right"] = "0"
+        document.getElementById("box").style["pointer-events"] = "none"
+        document.getElementById("boxMain").style["pointer-events"] = "auto"
+    })
+
+    createFinishButton = document.getElementById("createFinish")
+    createFinishButton.addEventListener("click", function() {
+        document.getElementById("serverScreen").style["right"] = "0%"
+        document.getElementById("createScreen").style["right"] = "100%"
         document.getElementById("box").style["pointer-events"] = "auto"
         document.getElementById("boxMain").style["pointer-events"] = "none"
         connection = new Server(board)
         connection.init()
         console.log(connection)
     })
+
+    backCreate = document.getElementById("backButtonCreate")
+    backCreate.addEventListener("click", function() {
+        document.getElementById("mainScreen").style["right"] = "0%"
+        document.getElementById("createScreen").style["right"] = "-100%"
+        document.getElementById("box").style["pointer-events"] = "none"
+        document.getElementById("boxMain").style["pointer-events"] = "auto"
+        connection = new Server(board)
+        connection.init()
+        console.log(connection)
+    })
+
 
     copyButton = document.getElementById("copy")
     copyButton.addEventListener("click", function() {
@@ -423,9 +451,10 @@ window.onload = function() {
     backServer = document.getElementById("backButtonServer")
     backServer.addEventListener("click", function() {
         document.getElementById("serverScreen").style["right"] = "-100%"
-        document.getElementById("mainScreen").style["right"] = "0"
-        document.getElementById("box").style["pointer-events"] = "none"
-        document.getElementById("boxMain").style["pointer-events"] = "auto"
+        document.getElementById("createScreen").style["right"] = "0"
+        document.getElementById("mainScreen").style["right"] = "100%"
+        document.getElementById("box").style["pointer-events"] = "auto"
+        document.getElementById("boxMain").style["pointer-events"] = "none"
     })
 
     joinButton = document.getElementById("join")
@@ -450,7 +479,6 @@ window.onload = function() {
         setTimeout(function() {connection.join()}.bind(connection), 100)
         console.log(connection)
     })
-
 }
 
 function runPerformanceTest() {
