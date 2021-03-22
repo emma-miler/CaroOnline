@@ -1,0 +1,1 @@
+emcc -Os -s STANDALONE_WASM -s EXPORTED_FUNCTIONS="['_addMove', '_getMoveAmount', '_getData', '_generatePiece', '_calcRook', '_reset', '_calcBishop', '_calcKnight', '_calcKing']" -Wl,--no-entry "hello.cpp" -o "caesar.wasm"

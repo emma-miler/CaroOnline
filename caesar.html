@@ -1,0 +1,37 @@
+<script>
+    (async () => {
+      const response = await fetch("caesar.wasm");
+      const file = await response.arrayBuffer();
+      const wasm = await WebAssembly.instantiate(file);
+      const { memory, addMove, getMoveAmount, getData, calcRook, generatePiece, reset } = wasm.instance.exports;
+        //addMove(1,2,3,4);
+        //addMove(5,6,7,8);
+        var tp = generatePiece(0, 0, 0, false);
+        const startTime = window.performance.now()
+        reset()
+        console.log(((window.performance.now() - startTime)/100000 * 1000).toString().substring(0, 5))
+        const moves = getMoveAmount()
+        //console.log(moves)
+
+        var offset = getData();
+        //console.log(offset)
+
+        var linearMemory = new Int32Array(memory.buffer, 0, moves * 5);
+
+        for (var i = 0; i < linearMemory.length / 5; i++) {
+            console.log(linearMemory[i * 5].toString() + linearMemory[i * 5 + 1].toString() + linearMemory[i * 5 + 2].toString() + linearMemory[i * 5 + 3].toString() + linearMemory[i * 5 + 4].toString());
+        }
+
+        /*
+        var offset = testFunc();
+        //console.log(offset)
+
+        var linearMemory = new Int32Array(memory.buffer, offset, 8);
+
+        for (var i = 0; i < linearMemory.length; i++) {
+            console.log(linearMemory[i]);
+            console.log("");
+        //}*/
+    })();
+  </script>
+  
