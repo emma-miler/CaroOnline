@@ -196,6 +196,63 @@ class Board {
         }
         return attacks
     }
+
+    async test() {
+        const response = await fetch("caesar.wasm");
+        const file = await response.arrayBuffer();
+        const wasm = await WebAssembly.instantiate(file);
+        const { memory, addMove, getMoveAmount, getData, generatePiece, reset, getBoardOffset, writeRow } = wasm.instance.exports;
+            //addMove(1,2,3,4);
+            //addMove(5,6,7,8);
+            var tp = generatePiece(0, 0, 0, false);
+            const startTime = window.performance.now()
+            reset()
+            console.log(((window.performance.now() - startTime)/100000 * 1000).toString().substring(0, 5))
+            const moves = getMoveAmount()
+            //console.log(moves)
+
+            //var offset = getData();
+            //console.log(offset)
+
+            //var linearMemory = new Int32Array(memory.buffer, 0, moves * 5);
+
+            //for (var i = 0; i < linearMemory.length / 5; i++) {
+            //    console.log(linearMemory[i * 5].toString() + linearMemory[i * 5 + 1].toString() + linearMemory[i * 5 + 2].toString() + linearMemory[i * 5 + 3].toString() + linearMemory[i * 5 + 4].toString());
+            //}
+            for (var y = 0; y < 8; y++) {
+                var s = [0, 0, 0, 0, 0, 0, 0, 0]
+                for (var x = 0; x < 8; x++) {
+                    s[x] = 1 + (board.grid[x][y].color * 2) + (board.grid[x][y].type << 2) + (board.grid[x][y].hasMoved * 64)
+                }
+                writeRow(y, s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7])
+            }
+            
+            var offset = getBoardOffset();
+            //console.log(offset)
+
+            var linearMemory = new Int32Array(memory.buffer, offset, 64);
+
+            for (var x = 0; x < 8; x++) {
+                y = 7-x
+                console.log(
+                    pad(linearMemory[y*8 + 0], 2) + " " +
+                    pad(linearMemory[y*8 + 1], 2) + " " +
+                    pad(linearMemory[y*8 + 2], 2) + " " +
+                    pad(linearMemory[y*8 + 3], 2) + " " +
+                    pad(linearMemory[y*8 + 4], 2) + " " +
+                    pad(linearMemory[y*8 + 5], 2) + " " +
+                    pad(linearMemory[y*8 + 6], 2) + " " +
+                    pad(linearMemory[y*8 + 7], 2)
+                );
+            }
+        }
+
+}
+
+function pad(n, width, z) {
+    z = z || '0';
+    n = n + '';
+    return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
 }
 
 class graphicsHandler {
@@ -590,11 +647,11 @@ window.onload = function() {
         board.isOffline = true
     })
     
-    //document.getElementById("overlay").style["display"] = "none"
-    //board.isOffline = true
+    document.getElementById("overlay").style["display"] = "none"
+    board.isOffline = true
 }
 
-function runPerformanceTest() {
+function runPerformanceTest1() {
     const timer = document.getElementById('stopwatch');
     var initTime = window.performance.now()
     var iter = 10000
@@ -626,7 +683,7 @@ function runPerformanceTest() {
     print("\n\n")
 }
 
-function runPerformanceTest1() {
+function runPerformanceTest2() {
     const timer = document.getElementById('stopwatch');
     var initTime = window.performance.now()
     var iter = 100000
@@ -637,4 +694,71 @@ function runPerformanceTest1() {
     var endTime = window.performance.now()
     timer.innerHTML = ((endTime - initTime)/iter * 1000).toString().substring(0, 5)
     print("\n\n")
+}
+
+async function runPerformanceTest() {
+    const response = await fetch("caesar.wasm");
+    const file = await response.arrayBuffer();
+    const wasm = await WebAssembly.instantiate(file);
+    const { memory, addMove, getMoveAmount, getData, generatePiece, reset, getBoardOffset, writeRow, generateMoves } = wasm.instance.exports;
+
+    var tp = generatePiece(0, 0, 0, false);
+    const startTime = window.performance.now()
+    reset()
+    console.log(((window.performance.now() - startTime)/100000 * 1000).toString().substring(0, 5))
+    const moves = getMoveAmount()
+    //console.log(moves)
+
+    //var offset = getData();
+    //console.log(offset)
+
+    //var linearMemory = new Int32Array(memory.buffer, 0, moves * 5);
+
+    //for (var i = 0; i < linearMemory.length / 5; i++) {
+    //    console.log(linearMemory[i * 5].toString() + linearMemory[i * 5 + 1].toString() + linearMemory[i * 5 + 2].toString() + linearMemory[i * 5 + 3].toString() + linearMemory[i * 5 + 4].toString());
+    //}
+    for (var y = 0; y < 8; y++) {
+        var s = [0, 0, 0, 0, 0, 0, 0, 0]
+        for (var x = 0; x < 8; x++) {
+            s[x] = 1 + (board.grid[x][y].color * 2) + (board.grid[x][y].type << 2) + (board.grid[x][y].hasMoved * 64)
+        }
+        writeRow(y, s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7])
+    }
+    
+    var offset = getBoardOffset();
+    //console.log(offset)
+
+    var boardMemory = new Int32Array(memory.buffer, offset, 64);
+
+    for (var x = 0; x < 8; x++) {
+        y = 7-x
+        console.log(
+            pad(boardMemory[y*8 + 0], 2) + " " +
+            pad(boardMemory[y*8 + 1], 2) + " " +
+            pad(boardMemory[y*8 + 2], 2) + " " +
+            pad(boardMemory[y*8 + 3], 2) + " " +
+            pad(boardMemory[y*8 + 4], 2) + " " +
+            pad(boardMemory[y*8 + 5], 2) + " " +
+            pad(boardMemory[y*8 + 6], 2) + " " +
+            pad(boardMemory[y*8 + 7], 2)
+        );
+    }
+
+    var piece = generatePiece(7, 7, 0, false)
+    var offset = reset()
+    var size = getMoveAmount()
+    var linearMemory = new Int32Array(memory.buffer, offset, 5 * size);
+
+    console.log(size)
+
+    for (var i = 0; i < linearMemory.length / 5; i++) {
+        console.log(
+            linearMemory[i * 5].toString() + " " + 
+            linearMemory[i * 5 + 1].toString() + " " + 
+            linearMemory[i * 5 + 2].toString() + " " + 
+            linearMemory[i * 5 + 3].toString() + " " + 
+            linearMemory[i * 5 + 4].toString()
+        );
+    }
+
 }

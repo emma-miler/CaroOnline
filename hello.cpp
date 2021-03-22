@@ -26,15 +26,17 @@ constexpr std::uint_fast8_t mask6{ 0b0100'0000 }; // represents bit 6
 constexpr std::uint_fast8_t mask7{ 0b1000'0000 }; // represents bit 7
 
 int board[8][8] = {
-    {0,0,0,0b0000'1111,0,0,0,0},
     {0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0},
-    {0,0,0,0b0000'1111,0,0,0,0}
+    {0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0}
 };
+
+int offsets[8] = {0,0,0,0,0,0,0,0};
 
 bool checks[2] = {false, false};
 
@@ -45,7 +47,17 @@ enum Direction {
     DIAGONALLEFT= 3
 };
 
+enum PType {
+    QUEEN= 0,
+    KING= 1,
+    ROOK= 2,
+    KNIGHT= 3,
+    BISHOP= 4,
+    PAWN= 5
+};
+
 struct Piece {
+    int type = 0;
     int x = 4;
     int y = 4;
     int color = 0;
@@ -81,7 +93,7 @@ extern "C" {
         return &(testPiece.x);
     }
 
-    void calcRook(Piece self, int skipSquare[], bool doSkip=false, bool control=false) {
+    void calcRook(Piece self, int skipSquare[], bool control=false, bool doSkip=false) {
         int n = 7 - self.x;
         int e = 7 - self.y;
         int s = self.x;
@@ -192,7 +204,7 @@ extern "C" {
         }
     }
 
-    void calcBishop(Piece self, int skipSquare[], bool doSkip=false, bool control=false) {
+    void calcBishop(Piece self, int skipSquare[], bool control=false, bool doSkip=false) {
         bool right = true;
         bool left = true;
         if (self.pinned) {
@@ -497,10 +509,10 @@ extern "C" {
             if (self.y == (self.color == 0 ? 6 : 1)) {
                 if ((!self.pinned) || self.pinDirection == VERTICAL) {
                     addMove(self.x, self.y, 0, m, 1);
-                    //plm.push(new Move(self.x, self.y, 0, m, isPromotion=true, promoteTo=PType.QUEEN))
-                    //plm.push(new Move(self.x, self.y, 0, m, isPromotion=true, promoteTo=PType.KNIGHT))
-                    //plm.push(new Move(self.x, self.y, 0, m, isPromotion=true, promoteTo=PType.ROOK))
-                    //plm.push(new Move(self.x, self.y, 0, m, isPromotion=true, promoteTo=PType.BISHOP))
+                    //plm.push(new Move(self.x, self.y, 0, m, isPromotion=true, promoteTo=QUEEN))
+                    //plm.push(new Move(self.x, self.y, 0, m, isPromotion=true, promoteTo=KNIGHT))
+                    //plm.push(new Move(self.x, self.y, 0, m, isPromotion=true, promoteTo=ROOK))
+                    //plm.push(new Move(self.x, self.y, 0, m, isPromotion=true, promoteTo=BISHOP))
                 }
             }
             else {
@@ -546,10 +558,132 @@ extern "C" {
         }*/
     }
 
-    void reset() {
-        for (int x = 0; x < 100000; x++) {
-            calcPawn(testPiece, {});
+    int* generateMoves(Piece self, bool ignoreCheck=false, bool control=false) {
+        moves = {};
+        if (self.type == PAWN) {
+            bool capLeft = true;
+            bool capRight = true;
+            if (self.pinned) {
+                if (self.pinDirection == DIAGONALRIGHT) {
+                    capRight = false;
+                }
+                if (self.pinDirection == DIAGONALLEFT) {
+                    capLeft = false;
+                }
+            }
+            calcPawn(self, capLeft, capRight, control);
         }
-        moves = 0;
+        else if (self.type == ROOK) {
+            if (self.pinned && (self.pinDirection == DIAGONALLEFT || self.pinDirection == DIAGONALRIGHT)) {
+                return &(arr[0]);
+            }
+            else {
+                calcRook(self, {}, control);
+            }
+        }
+        else if (self.type == QUEEN) {
+            calcBishop(self, {}, control);
+            calcRook(self, {}, control);
+        }
+        else if (self.type == BISHOP) {
+            if (self.pinned && (self.pinDirection == HORIZONTAL || self.pinDirection == VERTICAL)) {
+                return &(arr[0]);
+            }
+            else {
+                calcBishop(self, {}, control);
+            }
+        }
+        else if (self.type == KNIGHT) {
+            if (self.pinned) {
+                return &(arr[0]);
+            }
+            else {
+                calcKnight(self, control);
+            }
+        }
+        else if (self.type == KING) {
+            //var notChecked = []
+            calcKing(self);
+            /*for (const move of notChecked) {
+                var x = move.x + move.dx
+                var y = move.y + move.dy
+                var check = false
+                if (true) {
+                for (const controlled of board.controlled[board.turn == 0 ? 1 : 0]) {
+                    if (x == controlled.x + controlled.dx && y == controlled.y + controlled.dy) {
+                        check = true
+                        break
+                    } 
+                }
+                if (!check && move.isCastleShort) {
+                    for (const controlled of board.controlled[board.turn == 0 ? 1 : 0]) {
+                        if (x-1 == controlled.x + controlled.dx && y == controlled.y + controlled.dy) {
+                            check = true
+                            break
+                        } 
+                    }
+                }
+                if (!check && move.isCastleLong) {
+                    for (const controlled of board.controlled[board.turn == 0 ? 1 : 0]) {
+                        if (x+1 == controlled.x + controlled.dx && y == controlled.y + controlled.dy) {
+                            check = true
+                            break
+                        } 
+                    }
+                }
+
+                if (!check) {
+                    plm.push(move)
+                }
+            }
+            }*/
+        }
+        /*
+        if (!ignoreCheck && !(self.type == KING)) {
+            if (board.checks[board.turn]) {
+                var checkStop = []
+                for (const move of plm) {
+                    var x = move.x + move.dx
+                    var y = move.y + move.dy
+                    for (const square of board.checkStopSquares) {
+                        if (square[0] == x && square[1] == y) {
+                            checkStop.push(move)
+                        }
+                    }
+                    for (const checkingPiece of board.checkPieces) {
+                        if (checkingPiece.x == x && checkingPiece == y) {
+                            checkStop.push(move)
+                        }
+                    }
+                }
+                return checkStop
+            }
+            else {
+                return plm
+            }
+        }
+        else {
+            return plm
+        }*/
+        return &(arr[0]);
+    }
+
+    void reset() {
+        calcKnight(testPiece, {});
+    }
+
+    int* getBoardOffset() {
+        return &(board[0][0]);
+    }
+
+    void writeRow(int rowNumber, int data1, int data2, int data3, int data4, int data5, int data6, int data7, int data8) {
+        board[rowNumber][0] = data1;
+        board[rowNumber][1] = data2;
+        board[rowNumber][2] = data3;
+        board[rowNumber][3] = data4;
+        board[rowNumber][4] = data5;
+        board[rowNumber][5] = data6;
+        board[rowNumber][6] = data7;
+        board[rowNumber][7] = data8;
     }
 }
