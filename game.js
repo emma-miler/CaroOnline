@@ -647,8 +647,8 @@ window.onload = function() {
         board.isOffline = true
     })
     
-    document.getElementById("overlay").style["display"] = "none"
-    board.isOffline = true
+    //document.getElementById("overlay").style["display"] = "none"
+    //board.isOffline = true
 }
 
 function runPerformanceTest1() {
