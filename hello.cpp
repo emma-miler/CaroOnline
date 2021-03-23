@@ -96,14 +96,6 @@ extern "C" {
         return &(arr[0]);
     }
 
-    int* generatePiece(int x, int y, int color, bool pinned, enum Direction pinDirection = HORIZONTAL) {
-        testPiece.x = x;
-        testPiece.y = y;
-        testPiece.color = color;
-        testPiece.pinned = pinned;
-        return &(testPiece.x);
-    }
-
     void calcRook(int p, int px, int py, int sx=0, int sy=0, bool control=false, bool doSkip=false) {
         int n = 7 - px;
         int e = 7 - py;
@@ -730,16 +722,19 @@ extern "C" {
         return &(arr[0]);
     }
 
-    void reset(int px, int py, bool control) {
-        generateMoves(px, py, control);
-    }
-
     void createPiece(int p, int px, int py) {
         board[px][py] = p;
     }
 
     int* getBoardOffset() {
         return &(board[0][0]);
+    }
+
+    int performMove(int oldX, int oldY, int newX, int newY) {
+        int returnValue = board[newX][newY];
+        board[newX][newY] = board[oldX][oldY];
+        board[oldX][oldY] = 0;
+        return returnValue;
     }
 
     void writeRow(int rowNumber, int data1, int data2, int data3, int data4, int data5, int data6, int data7, int data8) {

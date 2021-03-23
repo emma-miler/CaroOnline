@@ -1,4 +1,4 @@
-function generateMoves(self, board, ignoreCheck=false, control=false) {
+function generateMoves1(self, board, ignoreCheck=false, control=false) {
     plm = []
     if (self.type == PType.PAWN) {
         var capLeft = true
