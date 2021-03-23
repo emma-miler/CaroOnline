@@ -3,6 +3,11 @@ int moves = 0;
 int *arr;
 int test[8];
 
+// TODO: Fix castling
+// TODO: Fix pins
+// TODO: Fix illegal king moves
+// TODO: Fix check stop
+
 // Bit 0: isOccupied
 // Bit 1: color
 // Bit 2-4: type:
@@ -31,10 +36,18 @@ constexpr std::uint_fast8_t mask5{ 0b0010'0000 }; // represents bit 5
 constexpr std::uint_fast8_t mask6{ 0b0100'0000 }; // represents bit 6
 constexpr std::uint_fast8_t mask7{ 0b1000'0000 }; // represents bit 7
 
-constexpr std::uint_fast8_t pieceMask{ 0b0001'1100 }; // represents bit 7
-constexpr std::uint_fast8_t pinDirMask{ 0b1100'0000 }; // represents bit 7
+constexpr std::uint_fast8_t pieceMask{ 0b0001'1100 }; // represents piece type mask
+constexpr std::uint_fast8_t pinDirMask{ 0b1100'0000 }; // represents nothing lol
 
-// 9 = 00001011
+constexpr std::uint_fast8_t prevXMask{ 0b0000'0111 }; // represents previous move x mask
+constexpr std::uint_fast8_t prevYMask{ 0b0011'1000 }; // represents previous move y mask
+
+int previousMoveFlags = 0b000000000000;
+// Bit 0-2: x
+// Bit 3-5: y
+// Bit 6: capture
+// Bit 7: en passantable
+// Bit 8-11: capture data
 
 int board[8][8] = {
     {9, 21, 0, 0, 0, 0, 23, 11},
@@ -569,8 +582,7 @@ extern "C" {
             }
             else {
                 if ((!(p & mask6))/* || self.pinDirection == VERTICAL*/) {
-                    addMove(px, py, 0, m, 0);
-                    //plm.push(new Move(px, py, 0, m))
+                    addMove(px, py, 0, m);
                 }
             }
         }
@@ -578,36 +590,23 @@ extern "C" {
         if (!(p & mask5) && board[px][py + m] == 0 && board[px][py + 2*m] == 0 && py == ((p & mask1) == 0 ? 1 : 6) && !control) {
             if ((!(p & mask6))/* || self.pinDirection == VERTICAL*/) {
                 addMove(px, py, 0, 2*m, 0);
-                //var move = new Move(px, py, 0, 2*m)
-                //move.enpassantable = true
-                //plm.push(move)
             }
         }
         // En Passant
-        // TODO: this ^
-        /*
-        if (py == 4 && board.moveList.length > 0 && board.moveList[board.moveList.length - 1].enpassantable && !control) {
-            if (px == 0 && board.moveList[-board.moveList.length - 1].x == 1) {
-                var move = new Move(px, py, 1, m)
-                move.isEnPassant = true
-                plm.push()
+        if ((py == 4 || py == 3) && (previousMoveFlags & mask7) && !control) {
+            if (px == 0 && (previousMoveFlags & prevXMask) == 1) {
+                addMove(px, py, 1, m);
             }
-            else if (px == 7 && board.moveList[board.moveList.length - 1].x == 6) {
-                var move = new Move(px, py, -1, m)
-                move.isEnPassant = true
-                plm.push(move)
+            else if (px == 7 && (previousMoveFlags & prevXMask) == 6) {
+                addMove(px, py, -1, m);
             }
-            else if (board.moveList[board.moveList.length - 1].x == px + 1) {
-                var move = new Move(px, py, 1, m)
-                move.isEnPassant = true
-                plm.push(move)
+            else if ((previousMoveFlags & prevXMask) == px + 1) {
+                addMove(px, py, 1, m);
             }
-            else if (board.moveList[board.moveList.length - 1].x == px - 1) {
-                var move = new Move(px, py, -1, m)
-                move.isEnPassant = true
-                plm.push(move)
+            else if ((previousMoveFlags & prevXMask) == px - 1) {
+                addMove(px, py, -1, m);
             }
-        }*/
+        }
     }
 
     int* generateMoves(int px, int py, bool ignoreCheck=false, bool control=false) {
@@ -733,6 +732,23 @@ extern "C" {
     int performMove(int oldX, int oldY, int newX, int newY) {
         int returnValue = board[newX][newY];
         board[newX][newY] = board[oldX][oldY];
+        if (previousMoveFlags & mask7) {
+            if (board[oldX][oldY] & mask1) { // Black en passant
+                board[newX][newY + 1] = 0;
+            }
+            else { // White en passant
+                board[newX][newY - 1] = 0;
+            }
+        }
+        previousMoveFlags = 0;
+        previousMoveFlags |= newX;
+        previousMoveFlags |= newY << 3;
+        if ((board[oldX][oldY] & pieceMask) == PAWN && (oldY-newY == 2 || oldY-newY==-2)) {
+            previousMoveFlags |= (1u << 7); // Set en passantable flag
+        }
+        else {
+            previousMoveFlags &= (1u << 7); // Clear en passantable flag
+        }
         board[oldX][oldY] = 0;
         return returnValue;
     }

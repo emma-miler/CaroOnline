@@ -356,8 +356,12 @@ class graphicsHandler {
             //print(event.button)
 
             if (this.selected == 0) {
-                if (this.flipped) {this.selected = [7 - y, 7 - x]}
-                else { this.selected = [7 - y, x] }
+                if (this.flipped) {
+                    if (board.grid[7-y][x] != 0) { this.selected = [7 - y, 7 - x] }
+                }
+                else {
+                    if (board.grid[7-y][x] != 0) { this.selected = [7 - y, x] }
+                }
                 print("Selected: " + d2b(this.selected))
             }
             else {
