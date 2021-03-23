@@ -2,6 +2,11 @@ function print(arg) {console.log(arg)}
 
 // TODO: implement some master signals for debugging
 
+function d2b(dec){
+    return (dec >>> 0).toString(2)
+}
+
+
 renderSources = [
     [0.0, 0.0, 150.0, 150.0],
     [150.0, 0.0, 150.0, 150.0],
@@ -17,6 +22,34 @@ renderSources = [
     [750.0, 150.0, 150.0, 150.0]
 ]
 
+const typeMask =  0b00011100
+const colorMask = 0b00000010
+
+const CPPType = {
+    QUEEN: 0,
+    KING: 4,
+    ROOK: 8,
+    KNIGHT: 12,
+    BISHOP: 16,
+    PAWN: 20
+};
+
+function JSType(x) {
+    switch (x) {
+    case 0:
+        return 0
+    case 4:
+        return 1
+    case 8:
+        return 2
+    case 12:
+        return 3
+    case 16:
+        return 4
+    case 20:
+        return 5
+    }
+}
 
 class Player {
     constructor(name, color, pieces=undefined) {
@@ -38,11 +71,12 @@ class Player {
                     new Piece(PType.KNIGHT, 1, 0, Color.WHITE),
                     new Piece(PType.BISHOP, 2, 0, Color.WHITE),
                     new Piece(PType.QUEEN, 3, 0, Color.WHITE),
-                    new Piece(PType.KING, 4, 3, Color.WHITE),
+                    new Piece(PType.KING, 4, 0, Color.WHITE),
                     new Piece(PType.BISHOP, 5, 0, Color.WHITE),
                     new Piece(PType.KNIGHT, 6, 0, Color.WHITE),
                     new Piece(PType.ROOK, 7, 0, Color.WHITE),
                 ]
+                this.pieces = []
             }
             else if (color == Color.BLACK) {
                 this.pieces = [
@@ -63,6 +97,7 @@ class Player {
                     new Piece(PType.KNIGHT, 6, 7, Color.BLACK),
                     new Piece(PType.ROOK, 7, 7, Color.BLACK),
                 ]
+                this.pieces = []
             }
         }
         else {
@@ -178,7 +213,7 @@ class Board {
         if (typeof(y) == "number") {
             this.players[piece.color].pieces.splice(y, 1)
         }
-        this.players[p.color == 0 ? 1 : 0].taken.push(piece.type)
+        this.players[piece.color == 0 ? 1 : 0].taken.push(piece.type)
         print(this.players)
         this.updateBoard()
     }
@@ -359,7 +394,7 @@ class graphicsHandler {
 
     }
 
-    draw() {
+    draw(testing=false, testMoves, piece) {
         this.p = this.canvas.getContext("2d")
         let h = window.innerHeight
         this.canvas.height = h
@@ -443,6 +478,26 @@ class graphicsHandler {
                 this.p.fillStyle = "rgba(255, 16, 16, 0.5)"
             }
             for (const move of generateMoves(this.selected, this.board)) {
+                x = move.x + move.dx
+                y = move.y + move.dy
+                this.p.beginPath()
+                if (this.flipped) {this.p.arc(s * (7-x) + s/2, y * s + s/2 + vo, s/4, 0, 2 * Math.PI, false)}
+                else {this.p.arc(s * x + s/2, (7 - y) * s + s/2 + vo, s/4, 0, 2 * Math.PI, false)}
+                this.p.fill()
+            }
+        }
+        if (testing) {
+            for (var x = 0; x < 8; x++) {
+                for (var y = 0; y < 8; y++) {
+                    if (this.board.grid[x][y] & 1) {
+                        var source = renderSources[((this.board.grid[x][y] & typeMask) >> 2) + 6*((this.board.grid[x][y] & colorMask) >> 1)]
+                        this.p.drawImage(this.image, source[0], source[1], 150, 150, y * s, (7-x) * s + vo, s, s)
+                    }
+                }
+            }
+            //this.p.drawImage(this.image, source[0], source[1], 150, 150, piece.x * s, (7-piece.y) * s + vo, s, s)
+            for (const move of testMoves) {
+                print("test123")
                 x = move.x + move.dx
                 y = move.y + move.dy
                 this.p.beginPath()
@@ -647,8 +702,10 @@ window.onload = function() {
         board.isOffline = true
     })
     
-    //document.getElementById("overlay").style["display"] = "none"
-    //board.isOffline = true
+    document.getElementById("overlay").style["display"] = "none"
+    board.isOffline = true
+
+    runCppTest()
 }
 
 function runPerformanceTest1() {
@@ -683,7 +740,7 @@ function runPerformanceTest1() {
     print("\n\n")
 }
 
-function runPerformanceTest2() {
+function runPerformanceTest() {
     const timer = document.getElementById('stopwatch');
     var initTime = window.performance.now()
     var iter = 100000
@@ -696,41 +753,60 @@ function runPerformanceTest2() {
     print("\n\n")
 }
 
-async function runPerformanceTest() {
+async function runCppTest() {
     const response = await fetch("caesar.wasm");
     const file = await response.arrayBuffer();
     const wasm = await WebAssembly.instantiate(file);
-    const { memory, addMove, getMoveAmount, getData, generatePiece, reset, getBoardOffset, writeRow, generateMoves } = wasm.instance.exports;
+    const { memory, addMove, getMoveAmount, getData, generatePiece, reset, getBoardOffset, writeRow, createPiece } = wasm.instance.exports;
 
-    var tp = generatePiece(0, 0, 0, false);
-    const startTime = window.performance.now()
-    reset()
-    console.log(((window.performance.now() - startTime)/100000 * 1000).toString().substring(0, 5))
-    const moves = getMoveAmount()
-    //console.log(moves)
-
-    //var offset = getData();
-    //console.log(offset)
-
-    //var linearMemory = new Int32Array(memory.buffer, 0, moves * 5);
-
-    //for (var i = 0; i < linearMemory.length / 5; i++) {
-    //    console.log(linearMemory[i * 5].toString() + linearMemory[i * 5 + 1].toString() + linearMemory[i * 5 + 2].toString() + linearMemory[i * 5 + 3].toString() + linearMemory[i * 5 + 4].toString());
-    //}
-    for (var y = 0; y < 8; y++) {
+    /*for (var y = 0; y < 8; y++) {
         var s = [0, 0, 0, 0, 0, 0, 0, 0]
         for (var x = 0; x < 8; x++) {
             s[x] = 1 + (board.grid[x][y].color * 2) + (board.grid[x][y].type << 2) + (board.grid[x][y].hasMoved * 64)
         }
+        console.log(s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7])
         writeRow(y, s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7])
-    }
-    
-    var offset = getBoardOffset();
+    }*/
+
+    //writeRow(0, 0, 0, CPPType.KNIGHT + 1, 0, 0, 0, 0, 0)
+
+    const pieceType = CPPType.BISHOP;
+    var px = 4
+    var py = 3
+    print(pieceType)
+
+    createPiece(pieceType + 1, px, py)
+    createPiece(CPPType.KNIGHT + 3, px-1, py)
+
+    var cStart = window.performance.now()
+    reset(px, py, true)
+    const moves = getMoveAmount()
+    console.log("Moves: " + moves)
+
+    var offset = getData();
     //console.log(offset)
+
+    var linearMemory = new Int32Array(memory.buffer, 0, moves * 5);
+    
+    /*for (var i = 0; i < linearMemory.length / 5; i++) {
+        var x= (
+            linearMemory[i * 5].toString() + " " + 
+            linearMemory[i * 5 + 1].toString() + " " + 
+            linearMemory[i * 5 + 2].toString() + " " + 
+            linearMemory[i * 5 + 3].toString() + " " + 
+            linearMemory[i * 5 + 4].toString());
+    }*/
+    var cEnd = window.performance.now()
+
+    var offset = getBoardOffset();
+    console.log(offset)
 
     var boardMemory = new Int32Array(memory.buffer, offset, 64);
 
     for (var x = 0; x < 8; x++) {
+        for (var y = 0; y < 8; y++) {
+            board.grid[x][y] = boardMemory[y*8 + x]
+        }
         y = 7-x
         console.log(
             pad(boardMemory[y*8 + 0], 2) + " " +
@@ -744,21 +820,23 @@ async function runPerformanceTest() {
         );
     }
 
-    var piece = generatePiece(7, 7, 0, false)
-    var offset = reset()
-    var size = getMoveAmount()
-    var linearMemory = new Int32Array(memory.buffer, offset, 5 * size);
 
-    console.log(size)
+    var jStart = window.performance.now()
+    generateMoves(board.grid[1][0], board)
+    var jEnd = window.performance.now()
+    console.log("C++: " + (cEnd - cStart))
+    console.log("JS: " + (jEnd - jStart))
 
+    var testMoves = []
     for (var i = 0; i < linearMemory.length / 5; i++) {
-        console.log(
-            linearMemory[i * 5].toString() + " " + 
-            linearMemory[i * 5 + 1].toString() + " " + 
-            linearMemory[i * 5 + 2].toString() + " " + 
-            linearMemory[i * 5 + 3].toString() + " " + 
-            linearMemory[i * 5 + 4].toString()
-        );
+        var x = linearMemory[i * 5]
+        var y = linearMemory[i * 5 + 1]
+        var dx = linearMemory[i * 5 + 2]
+        var dy = linearMemory[i * 5 + 3]
+        var isCap = linearMemory[i * 5 + 4] ? true : false
+        print(x + " " + y + " " + dx + " " + dy)
+        testMoves.push(new Move(x, y, dx, dy, isCap))
     }
+    gui.draw(true, testMoves, new Piece(JSType(pieceType), px, py))
 
 }

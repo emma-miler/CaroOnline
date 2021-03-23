@@ -15,6 +15,12 @@ int test[8];
 // 110: unused
 // 111: unused
 // Bit 5: hasMoved
+// Bit 6: isPinned
+
+// Board 2 (info board)
+// Bit 0: hasMoved
+// Bit 1: isPinned
+// Bit 2-3: pinDirection
 
 constexpr std::uint_fast8_t mask0{ 0b0000'0001 }; // represents bit 0
 constexpr std::uint_fast8_t mask1{ 0b0000'0010 }; // represents bit 1
@@ -25,15 +31,20 @@ constexpr std::uint_fast8_t mask5{ 0b0010'0000 }; // represents bit 5
 constexpr std::uint_fast8_t mask6{ 0b0100'0000 }; // represents bit 6
 constexpr std::uint_fast8_t mask7{ 0b1000'0000 }; // represents bit 7
 
+constexpr std::uint_fast8_t pieceMask{ 0b0001'1100 }; // represents bit 7
+constexpr std::uint_fast8_t pinDirMask{ 0b1100'0000 }; // represents bit 7
+
+// 9 = 00001011
+
 int board[8][8] = {
-    {0,0,0,0,0,0,0,0},
-    {0,0,0,0,0,0,0,0},
-    {0,0,0,0,0,0,0,0},
-    {0,0,0,0,0,0,0,0},
-    {0,0,0,0,0,0,0,0},
-    {0,0,0,0,0,0,0,0},
-    {0,0,0,0,0,0,0,0},
-    {0,0,0,0,0,0,0,0}
+    {9, 21, 0, 0, 0, 0, 23, 11},
+    {13, 21, 0, 0, 0, 0, 23, 15},
+    {17, 21, 0, 0, 0, 0, 23, 19},
+    {1, 21, 0, 0, 0, 0, 23, 3},
+    {5, 21, 0, 0, 0, 0, 23, 7},
+    {17, 21, 0, 0, 0, 0, 23, 19},
+    {13, 21, 0, 0, 0, 0, 23, 15},
+    {9, 21, 0, 0, 0, 0, 23, 11}
 };
 
 int offsets[8] = {0,0,0,0,0,0,0,0};
@@ -42,18 +53,18 @@ bool checks[2] = {false, false};
 
 enum Direction {
     HORIZONTAL= 0,
-    VERTICAL= 1,
-    DIAGONALRIGHT= 2,
-    DIAGONALLEFT= 3
+    VERTICAL= 64,
+    DIAGONALRIGHT= 128,
+    DIAGONALLEFT= 192
 };
 
 enum PType {
     QUEEN= 0,
-    KING= 1,
-    ROOK= 2,
-    KNIGHT= 3,
-    BISHOP= 4,
-    PAWN= 5
+    KING= 4,
+    ROOK= 8,
+    KNIGHT= 12,
+    BISHOP= 16,
+    PAWN= 20
 };
 
 struct Piece {
@@ -93,40 +104,41 @@ extern "C" {
         return &(testPiece.x);
     }
 
-    void calcRook(Piece self, int skipSquare[], bool control=false, bool doSkip=false) {
-        int n = 7 - self.x;
-        int e = 7 - self.y;
-        int s = self.x;
-        int w = self.y;
+    void calcRook(int p, int px, int py, int sx=0, int sy=0, bool control=false, bool doSkip=false) {
+        int n = 7 - px;
+        int e = 7 - py;
+        int s = px;
+        int w = py;
 
         bool hor = true;
         bool ver = true;
-        if (self.pinned) {
-            if (self.pinDirection == VERTICAL) {
+        if (p & mask6) {
+            return;
+            /*if (self.pinDirection == VERTICAL) {
                 hor = false;
             }
             else if (self.pinDirection == HORIZONTAL) {
                 ver = false;
-            }
+            }*/
         }
 
         if (hor) {
             for (int x = 1; x < n + 1; x++) {
                 if (doSkip) {
-                    if (self.x + x == skipSquare[0] && self.y == skipSquare[1]) {
+                    if (px + x == sx && py == sy) {
                         continue;
                     }
                 }
-                if (board[self.x + x][self.y] == 0) {
-                    addMove(self.x, self.y, x, 0);
-                    //plm.push(new Move(self.x, self.y, x, 0));
+                if (board[px + x][py] == 0) {
+                    addMove(px, py, x, 0);
+                    //plm.push(new Move(px, py, x, 0));
                 }
-                else if ((board[self.x + x][self.y] & mask1) != self.color || control) {
-                    //int move = new Move(self.x, self.y, x, 0);
+                else if ((board[px + x][py] & mask1) != (p & mask1) || control) {
+                    //int move = new Move(px, py, x, 0);
                     //move.isCapture = true;
-                    //move.captureType = captureType=board[self.x + x][self.y].type;
+                    //move.captureType = captureType=board[px + x][py].type;
                     //plm.push(move);
-                    addMove(self.x, self.y, x, 0, 1);
+                    addMove(px, py, x, 0, 1);
                     break;
                 }
                 else {
@@ -135,20 +147,20 @@ extern "C" {
             }
             for (int x = 1; x < s + 1; x++) {
                 if (doSkip) {
-                    if (self.x - x == skipSquare[0] && self.y == skipSquare[1]) {
+                    if (px - x == sx && py == sy) {
                         continue;
                     }
                 }
-                if (board[self.x - x][self.y] == 0) {
-                    addMove(self.x, self.y, -x, 0);
-                    //plm.push(new Move(self.x, self.y, -x, 0));
+                if (board[px - x][py] == 0) {
+                    addMove(px, py, -x, 0);
+                    //plm.push(new Move(px, py, -x, 0));
                 }
-                else if ((board[self.x - x][self.y] & mask1) != self.color || control) {
-                    //int move = new Move(self.x, self.y, -x, 0);
+                else if ((board[px - x][py] & mask1) != (p & mask1) || control) {
+                    //int move = new Move(px, py, -x, 0);
                     //move.isCapture = true;
-                    //move.captureType=board[self.x - x][self.y].type;
+                    //move.captureType=board[px - x][py].type;
                     //plm.push(move);
-                    addMove(self.x, self.y, -x, 0, 1);
+                    addMove(px, py, -x, 0, 1);
                     break;
                 }
                 else {
@@ -159,20 +171,20 @@ extern "C" {
         if (ver) {
             for (int x = 1; x < e + 1; x++) {
                 if (doSkip) {
-                    if (self.x == skipSquare[0] && self.y + x == skipSquare[1]) {
+                    if (px == sx && py + x == sy) {
                         continue;
                     }
                 }
-                if (board[self.x][self.y + x] == 0) {
-                    //plm.push(new Move(self.x, self.y, 0, x));
-                    addMove(self.x, self.y, 0, x);
+                if (board[px][py + x] == 0) {
+                    //plm.push(new Move(px, py, 0, x));
+                    addMove(px, py, 0, x);
                 }
-                else if ((board[self.x][self.y + x] & mask1) != self.color || control) {
-                    //int move = new Move(self.x, self.y, 0, x);
+                else if ((board[px][py + x] & mask1) != (p & mask1) || control) {
+                    //int move = new Move(px, py, 0, x);
                     //move.isCapture = true;
-                    //move.captureType=board[self.x][self.y + x].type;
+                    //move.captureType=board[px][py + x].type;
                     //plm.push(move);
-                    addMove(self.x, self.y, 0, x, 1);
+                    addMove(px, py, 0, x, 1);
                     break;
                 }
                 else {
@@ -181,20 +193,20 @@ extern "C" {
             }
             for (int x = 1; x < w + 1; x++) {
                 if (doSkip) {
-                    if (self.x == skipSquare[0] && self.y - x == skipSquare[1]) {
+                    if (px == sx && py - x == sy) {
                         continue;
                     }
                 }
-                if (board[self.x][self.y - x] == 0) {
-                    //plm.push(new Move(self.x, self.y, 0, -x));
-                    addMove(self.x, self.y, 0, -x);
+                if (board[px][py - x] == 0) {
+                    //plm.push(new Move(px, py, 0, -x));
+                    addMove(px, py, 0, -x);
                 }
-                else if ((board[self.x][self.y - x] & mask1) != self.color || control) {
-                    //int move = new Move(self.x, self.y, 0, -x);
+                else if ((board[px][py - x] & mask1) != (p & mask1) || control) {
+                    //int move = new Move(px, py, 0, -x);
                     //move.isCapture = true;
-                    //move.captureType=board[self.x][self.y - x].type;
+                    //move.captureType=board[px][py - x].type;
                     //plm.push(move);
-                    addMove(self.x, self.y, 0, -x, 1);
+                    addMove(px, py, 0, -x, 1);
                     break;
                 }
                 else {
@@ -204,35 +216,37 @@ extern "C" {
         }
     }
 
-    void calcBishop(Piece self, int skipSquare[], bool control=false, bool doSkip=false) {
+    void calcBishop(int p, int px, int py, int sx=0, int sy=0, bool control=false, bool doSkip=false) {
         bool right = true;
         bool left = true;
-        if (self.pinned) {
+        if (p & mask6) {
+            return;
+            /*
             if (self.pinDirection == DIAGONALRIGHT){
                 left = false;
             }
             else if (self.pinDirection == DIAGONALLEFT){
                 right = false;
-            }
+            }*/
         }
         if (right) {
             for (int x = 1; x < 8; x++) {
                 if (doSkip) {
-                    if (self.x + x == skipSquare[0] && self.y + x == skipSquare[1]) {
+                    if (px + x == sx && py + x == sy) {
                         continue;
                     }
                 }
-                if (self.x + x <= 7 && self.y + x <= 7){
-                    if (board[self.x + x][self.y + x] == 0){
-                        addMove(self.x, self.y, x, x);
-                        //plm.push(new Move(self.x, self.y, x, x))
+                if (px + x <= 7 && py + x <= 7){
+                    if (board[px + x][py + x] == 0){
+                        addMove(px, py, x, x);
+                        //plm.push(new Move(px, py, x, x))
                     }
-                    else if ((board[self.x + x][self.y + x] & mask1) != self.color || control){
-                        //var move = new Move(self.x, self.y, x, x)
+                    else if ((board[px + x][py + x] & mask1) != (p & mask1) || control){
+                        //var move = new Move(px, py, x, x)
                         //move.isCapture = true
-                        //move.captureType=board[self.x + x][self.y + x].type
+                        //move.captureType=board[px + x][py + x].type
                         //plm.push(move)
-                        addMove(self.x, self.y, x, x, 1);
+                        addMove(px, py, x, x, 1);
                         break;
                     }
                     else {
@@ -242,21 +256,21 @@ extern "C" {
             }
             for (int x = 1; x < 8; x++) {
                 if (doSkip) {
-                    if (self.x - x == skipSquare[0] && self.y - x == skipSquare[1]) {
+                    if (px - x == sx && py - x == sy) {
                         continue;
                     }
                 }
-                if (self.x - x >= 0 && self.y - x >= 0){
-                    if (board[self.x - x][self.y - x] == 0){
-                        //plm.push(new Move(self.x, self.y, -x, -x))
-                        addMove(self.x, self.y, -x, -x);
+                if (px - x >= 0 && py - x >= 0){
+                    if (board[px - x][py - x] == 0){
+                        //plm.push(new Move(px, py, -x, -x))
+                        addMove(px, py, -x, -x);
                     }
-                    else if ((board[self.x - x][self.y - x] & mask1) != self.color || control){
-                        //var move = new Move(self.x, self.y, -x, -x)
+                    else if ((board[px - x][py - x] & mask1) != (p & mask1) || control){
+                        //var move = new Move(px, py, -x, -x)
                         //move.isCapture = true
-                        //move.captureType=board[self.x - x][self.y - x].type
+                        //move.captureType=board[px - x][py - x].type
                         //plm.push(move)
-                        addMove(self.x, self.y, -x, -x, 1);
+                        addMove(px, py, -x, -x, 1);
                         break;
                     }
                     else{
@@ -268,21 +282,21 @@ extern "C" {
         if (left){
             for (int x = 1; x < 8; x++) {
                 if (doSkip) {
-                    if (self.x - x == skipSquare[0] && self.y + x == skipSquare[1]) {
+                    if (px - x == sx && py + x == sy) {
                         continue;
                     }
                 }
-                if (self.x - x >= 0 && self.y + x <= 7){
-                    if (board[self.x - x][self.y + x] == 0){
-                        //plm.push(new Move(self.x, self.y, -x, x))
-                        addMove(self.x, self.y, -x, x);
+                if (px - x >= 0 && py + x <= 7){
+                    if (board[px - x][py + x] == 0){
+                        //plm.push(new Move(px, py, -x, x))
+                        addMove(px, py, -x, x);
                     }
-                    else if ((board[self.x - x][self.y + x] & mask1) != self.color || control){
-                        //var move = new Move(self.x, self.y, -x, x)
+                    else if ((board[px - x][py + x] & mask1) != (p & mask1) || control){
+                        //var move = new Move(px, py, -x, x)
                         //move.isCapture = true
-                        //move.captureType=board[self.x - x][self.y + x].type
+                        //move.captureType=board[px - x][py + x].type
                         //plm.push(move)
-                        addMove(self.x, self.y, -x, x, 1);
+                        addMove(px, py, -x, x, 1);
                         break;
                     }
                     else{
@@ -292,21 +306,21 @@ extern "C" {
             }
             for (int x = 1; x < 8; x++) {
                 if (doSkip) {
-                    if (self.x + x == skipSquare[0] && self.y - x == skipSquare[1]) {
+                    if (px + x == sx && py - x == sy) {
                         continue;
                     }
                 }
-                if (self.x + x <= 7 && self.y - x >= 0){
-                    if (board[self.x + x][self.y - x] == 0){
-                        //plm.push(new Move(self.x, self.y, x, -x))
-                        addMove(self.x, self.y, x, -x);
+                if (px + x <= 7 && py - x >= 0){
+                    if (board[px + x][py - x] == 0){
+                        //plm.push(new Move(px, py, x, -x))
+                        addMove(px, py, x, -x);
                     }
-                    else if ((board[self.x + x][self.y - x] & mask1) != self.color || control){
-                        //var move = new Move(self.x, self.y, x, -x)
+                    else if ((board[px + x][py - x] & mask1) != (p & mask1) || control){
+                        //var move = new Move(px, py, x, -x)
                         //move.isCapture = true
-                        //move.captureType=board[self.x + x][self.y - x].type
+                        //move.captureType=board[px + x][py - x].type
                         //plm.push(move)
-                        addMove(self.x, self.y, x, -x, 1);
+                        addMove(px, py, x, -x, 1);
                         break;
                     }
                     else{
@@ -317,121 +331,167 @@ extern "C" {
         }
     }
 
-    void calcKnight(Piece self, bool control=false) {
-        if (self.x > 1) {
-            if (self.y + 1 <= 7 && (board[self.x - 2][self.y + 1] == 0 || (board[self.x - 2][self.y + 1] & mask1) != self.color)){
-                addMove(self.x, self.y, -2, 1, board[self.x - 2][self.x + 1] & mask0);
+    void calcKnight(int p, int px, int py, bool control=false) {
+        if (px > 1) {
+            if (py + 1 <= 7 && (board[px - 2][py + 1] == 0 || (board[px - 2][py + 1] & mask1) != (p & mask1))){
+                addMove(px, py, -2, 1, board[px - 2][px + 1] & mask0);
             }
-            if (self.y - 1 >= 0 && (board[self.x - 2][self.y - 1] == 0 || (board[self.x - 2][self.y - 1] & mask1) != self.color)) {
-                addMove(self.x, self.y, -2, -1, board[self.x - 2][self.x - 1] & mask0);
-            }
-        }
-        if (self.x > 0) {
-            if (self.y + 2 <= 7 && (board[self.x - 1][self.y + 2] == 0 || (board[self.x - 1][self.y + 2] & mask1) != self.color)) {
-                addMove(self.x, self.y, -1, 2, board[self.x - 1][self.x + 2] & mask0);
-            }
-            if (self.y - 2 >= 0 && (board[self.x - 1][self.y - 2] == 0 || (board[self.x - 1][self.y - 2] & mask1) != self.color)) {
-                addMove(self.x, self.y, -1, -2, board[self.x - 1][self.x - 2] & mask0);
+            if (py - 1 >= 0 && (board[px - 2][py - 1] == 0 || (board[px - 2][py - 1] & mask1) != (p & mask1))) {
+                addMove(px, py, -2, -1, board[px - 2][px - 1] & mask0);
             }
         }
-        if (self.x < 6) {
-            if (self.y + 1 <= 7 && (board[self.x + 2][self.y + 1] == 0 || (board[self.x + 2][self.y + 1] & mask1) != self.color)) {
-                addMove(self.x, self.y, 2, 1, board[self.x + 2][self.x + 1] & mask0);
+        if (px > 0) {
+            if (py + 2 <= 7 && (board[px - 1][py + 2] == 0 || (board[px - 1][py + 2] & mask1) != (p & mask1))) {
+                addMove(px, py, -1, 2, board[px - 1][px + 2] & mask0);
             }
-            if (self.y - 1 >= 0 && (board[self.x + 2][self.y - 1] == 0 || (board[self.x + 2][self.y - 1] & mask1) != self.color)) {
-                addMove(self.x, self.y, 2, -1, board[self.x + 2][self.x - 1] & mask0);
+            if (py - 2 >= 0 && (board[px - 1][py - 2] == 0 || (board[px - 1][py - 2] & mask1) != (p & mask1))) {
+                addMove(px, py, -1, -2, board[px - 1][px - 2] & mask0);
             }
         }
-        if (self.x < 7) {
-            if (self.y + 2 <= 7 && (board[self.x + 1][self.y + 2] == 0 || (board[self.x + 1][self.y + 2] & mask1) != self.color)) {
-                addMove(self.x, self.y, 1, 2, board[self.x + 1][self.x + 2] & mask0);
+        if (px < 6) {
+            if (py + 1 <= 7 && (board[px + 2][py + 1] == 0 || (board[px + 2][py + 1] & mask1) != (p & mask1))) {
+                addMove(px, py, 2, 1, board[px + 2][px + 1] & mask0);
             }
-            if (self.y - 2 >= 0 && (board[self.x + 1][self.y - 2] == 0 || (board[self.x + 1][self.y - 2] & mask1) != self.color)) {
-                addMove(self.x, self.y, 1, -2, board[self.x + 1][self.x - 2] & mask0);
+            if (py - 1 >= 0 && (board[px + 2][py - 1] == 0 || (board[px + 2][py - 1] & mask1) != (p & mask1))) {
+                addMove(px, py, 2, -1, board[px + 2][px - 1] & mask0);
+            }
+        }
+        if (px < 7) {
+            if (py + 2 <= 7 && (board[px + 1][py + 2] == 0 || (board[px + 1][py + 2] & mask1) != (p & mask1))) {
+                addMove(px, py, 1, 2, board[px + 1][px + 2] & mask0);
+            }
+            if (py - 2 >= 0 && (board[px + 1][py - 2] == 0 || (board[px + 1][py - 2] & mask1) != (p & mask1))) {
+                addMove(px, py, 1, -2, board[px + 1][px - 2] & mask0);
             }
         }
     }
 
-    void calcKing(Piece self, bool control=false) {
-        if (self.y != 7) {
-            if (7 > self.x > 0) {
-                if ((board[self.x - 1][self.y + 1] & mask1) != self.color) {
-                    addMove(self.x, self.y, -1, 1);
+    void calcKing(int p, int px, int py, bool control=false) {
+        if (py != 7) {
+            if (7 > px > 0) {
+                //board[px - 1][py + 1] == 0 || (board[px - 1][py + 1] & mask1) != (p & mask1) || control
+                if (board[px - 1][py + 1] == 0) {
+                    addMove(px, py, -1, 1);
                 }
-                if ((board[self.x][self.y + 1] & mask1) != self.color) {
-                    addMove(self.x, self.y, 0, 1);
+                else if ((board[px - 1][py + 1] & mask1) != (p & mask1)) {
+                    addMove(px, py, -1, 1);
                 }
-                if ((board[self.x + 1][self.y + 1] & mask1) != self.color) {
-                    addMove(self.x, self.y, +1, 1);
+                if (board[px][py + 1] == 0) {
+                    addMove(px, py, 0, 1);
                 }
-            }
-            else if (self.x == 0) {
-                if ((board[self.x + 1][self.y + 1] & mask1) != self.color) {
-                    addMove(self.x, self.y, +1, 1);
+                else if ((board[px][py + 1] & mask1) != (p & mask1)) {
+                    addMove(px, py, 0, 1);
                 }
-            }
-            else if (self.x == 7) {
-                if ((board[self.x - 1][self.y + 1] & mask1) != self.color) {
-                    addMove(self.x, self.y, -1, 1);
+                if (board[px + 1][py + 1] == 0) {
+                    addMove(px, py, +1, 1);
                 }
-            }
-        }
-        if (self.y != 0) {
-            if (7 > self.x > 0) {
-                if ((board[self.x - 1][self.y - 1] & mask1) != self.color) {
-                    addMove(self.x, self.y, -1, -1);
-                }
-                if ((board[self.x][self.y - 1] & mask1) != self.color) {
-                    addMove(self.x, self.y, 0, -1);
-                }
-                if ((board[self.x + 1][self.y - 1] & mask1) != self.color) {
-                    addMove(self.x, self.y, +1, -1);
+                else if ((board[px + 1][py + 1] & mask1) != (p & mask1)) {
+                    addMove(px, py, +1, 1);
                 }
             }
-            else if (self.x == 0) {
-                if ((board[self.x + 1][self.y - 1] & mask1) != self.color) {
-                    addMove(self.x, self.y, +1, -1);
+            else if (px == 0) {
+                if (board[px + 1][py + 1] == 0) {
+                    addMove(px, py, 1, 1);
+                }
+                else if ((board[px + 1][py + 1] & mask1) != (p & mask1)) {
+                    addMove(px, py, 1, 1);
                 }
             }
-            else if (self.x == 7) {
-                if ((board[self.x - 1][self.y - 1] & mask1) != self.color) {
-                    addMove(self.x, self.y, -1, -1);
+            else if (px == 7) {
+                if (board[px - 1][py + 1] == 0) {
+                    addMove(px, py, -1, 1);
+                }
+                else if ((board[px - 1][py + 1] & mask1) != (p & mask1)) {
+                    addMove(px, py, -1, 1);
                 }
             }
         }
-        if (7 > self.x > 0) {
-            if ((board[self.x - 1][self.y] & mask1) != self.color) {
-                addMove(self.x, self.y, -1, 0);
+        if (py != 0) {
+            if (7 > px > 0) {
+                if (board[px - 1][py - 1] == 0) {
+                    addMove(px, py, -1, -1);
+                }
+                else if ((board[px - 1][py - 1] & mask1) != (p & mask1)) {
+                    addMove(px, py, -1, -1);
+                }
+                if (board[px][py - 1] == 0) {
+                    addMove(px, py, 0, -1);
+                }
+                else if ((board[px][py - 1] & mask1) != (p & mask1)) {
+                    addMove(px, py, 0, -1);
+                }
+                if (board[px + 1][py - 1] == 0) {
+                    addMove(px, py, 1, -1);
+                }
+                else if ((board[px + 1][py - 1] & mask1) != (p & mask1)) {
+                    addMove(px, py, 1, -1);
+                }
             }
-            if ((board[self.x][self.y] & mask1) != self.color) {
-                addMove(self.x, self.y, 0, 0);
+            else if (px == 0) {
+                if (board[px + 1][py - 1] == 0) {
+                    addMove(px, py, 1, -1);
+                }
+                else if ((board[px + 1][py - 1] & mask1) != (p & mask1)) {
+                    addMove(px, py, 1, -1);
+                }
             }
-            if ((board[self.x + 1][self.y] & mask1) != self.color) {
-                addMove(self.x, self.y, +1, 0);
+            else if (px == 7) {
+                if (board[px - 1][py - 1] == 0) { 
+                    addMove(px, py, -1, -1);
+                }
+                else if ((board[px - 1][py - 1] & mask1) != (p & mask1)) {
+                    addMove(px, py, -1, -1);
+                }
             }
         }
-        else if (self.x == 0) {
-            if ((board[self.x + 1][self.y] & mask1) != self.color) {
-                addMove(self.x, self.y, +1, 0);
+        if (7 > px > 0) {
+            if (board[px - 1][py] == 0) {
+                addMove(px, py, -1, 0);
+            } 
+            else if ((board[px - 1][py] & mask1) != (p & mask1)) {
+                addMove(px, py, -1, 0);
+            }
+            if (board[px][py] == 0) {
+                addMove(px, py, 0, 0);
+            } 
+            else if ((board[px][py] & mask1) != (p & mask1)) {
+                addMove(px, py, 0, 0);
+            }
+            if(board[px + 1][py] == 0) {
+                addMove(px, py, 1, 0);
+            }
+            else if ((board[px + 1][py] & mask1) != (p & mask1)) {
+                addMove(px, py, 1, 0);
             }
         }
-        else if (self.x == 7) {
-            if ((board[self.x - 1][self.y] & mask1) != self.color) {
-                addMove(self.x, self.y, -1, 0);
+        else if (px == 0) {
+            if (board[px + 1][py] == 0){
+                addMove(px, py, +1, 0);
+            }
+            else if ((board[px + 1][py] & mask1) != (p & mask1)) {
+                addMove(px, py, +1, 0);
+            }
+        }
+        else if (px == 7) {
+            if (board[px - 1][py] == 0) {
+                addMove(px, py, -1, 0);
+            }
+            else if ((board[px - 1][py] & mask1) != (p & mask1)) {
+                addMove(px, py, -1, 0);
             }
         }
 
         // Castling
-        if (!self.hasMoved && !checks[self.color] && false) {
+        if (!(p & mask5) && !checks[(p & mask1)] && false) {
             // White
-            if (self.color == 0) {
+            if ((p & mask1) == 0) {
                 // Short
                 int maybeRook = board[7][0];
                 if (maybeRook & mask0) {
-                    if ((maybeRook & mask2 & mask3 & mask4 == 2) && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == self.color) {
+                    if ((maybeRook & mask2 & mask3 & mask4 == 2) && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == (p & mask1)) {
                         if (board[5][0] == 0 && board[6][0] == 0) {
-                            addMove(self.x, self.y, 2, 0, 1);
-                            //var move = new Move(self.x, self.y, 2, 0)
+                            addMove(px, py, 2, 0, 1);
+                            //var move = new Move(px, py, 2, 0)
                             //move.isCastleShort = true
                             //plm.push(move)
                         }
@@ -439,10 +499,10 @@ extern "C" {
 
                     // Long
                     int maybeRook = board[0][0];
-                    if ((maybeRook & mask2 & mask3 & mask4 == 2) && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == self.color) {
+                    if ((maybeRook & mask2 & mask3 & mask4 == 2) && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == (p & mask1)) {
                         if (board[1][0] == 0 && board[2][0] == 0 && board[3][0] == 0) {
-                            addMove(self.x, self.y, -2, 0, 1);
-                            //var move = new Move(self.x, self.y, -2, 0)
+                            addMove(px, py, -2, 0, 1);
+                            //var move = new Move(px, py, -2, 0)
                             //move.isCastleLong = true
                             //plm.push(move)
                         }
@@ -451,14 +511,14 @@ extern "C" {
             }
 
             // Black
-            else if (self.color == 1) {
+            else if ((p & mask1) == 1) {
                 // Short
                 int maybeRook = board[7][7];
                 if (maybeRook & mask0) {
-                    if ((maybeRook & mask2 & mask3 & mask4 == 2) && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == self.color) {
+                    if ((maybeRook & mask2 & mask3 & mask4 == 2) && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == (p & mask1)) {
                         if (board[5][7] == 0 && board[6][7] == 0) {
-                            addMove(self.x, self.y, 2, 0, 1);
-                            //var move = new Move(self.x, self.y, 2, 0)
+                            addMove(px, py, 2, 0, 1);
+                            //var move = new Move(px, py, 2, 0)
                             //move.isCastleShort = true
                             //plm.push(move)
                         }
@@ -466,10 +526,10 @@ extern "C" {
 
                     // Long
                     int maybeRook = board[0][7];
-                    if ((maybeRook & mask2 & mask3 & mask4 == 2) && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == self.color) {
+                    if ((maybeRook & mask2 & mask3 & mask4 == 2) && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == (p & mask1)) {
                         if (board[1][7] == 0 && board[2][7] == 0 && board[3][7] == 0) {
-                            addMove(self.x, self.y, -2, 0, 1);
-                            //var move = new Move(self.x, self.y, -2, 0)
+                            addMove(px, py, -2, 0, 1);
+                            //var move = new Move(px, py, -2, 0)
                             //move.isCastleLong = true
                             //plm.push(move)
                         }
@@ -479,54 +539,54 @@ extern "C" {
         }
     }
 
-    void calcPawn(Piece self, bool capleft=true, bool capright=true, bool control=false) {
-        int m = self.color == 0 ? 1 : -1;
+    void calcPawn(int p, int px, int py, bool capleft=true, bool capright=true, bool control=false) {
+        int m = (p & mask1) == 0 ? 1 : -1;
 
         // Captures
-        if (self.x > 0) {
-            if ((board[self.x - 1][self.y + m] != 0 && (board[self.x - 1][self.y + m] & mask1) != self.color && capleft || control) && capleft) {
-                if ((!self.pinned) || self.pinDirection == DIAGONALLEFT) {
-                    addMove(self.x, self.y, -1, m, 1);
-                    //var move = new Move(self.x, self.y, -1, m)
+        if (px > 0) {
+            if ((board[px - 1][py + m] != 0 && (board[px - 1][py + m] & mask1) != (p & mask1) && capleft || control) && capleft) {
+                if ((!(p & mask6))/* || self.pinDirection == DIAGONALLEFT*/) {
+                    addMove(px, py, -1, m, 1);
+                    //var move = new Move(px, py, -1, m)
                     //move.isCapture = true
-                    //move.captureType = board[self.x - 1][self.y + m].type
+                    //move.captureType = board[px - 1][py + m].type
                     //plm.push(move)
                 }
             }
         }
-        if (self.x < 7) {
-            if ((board[self.x + 1][self.y + m] != 0 && (board[self.x + 1][self.y + m] & mask1) != self.color || control) && capright) {
-                if ((!self.pinned) || self.pinDirection == DIAGONALRIGHT) {
-                    addMove(self.x, self.y, 1, m, 1);
-                    //var move = new Move(self.x, self.y, 1, m)
+        if (px < 7) {
+            if ((board[px + 1][py + m] != 0 && (board[px + 1][py + m] & mask1) != (p & mask1) || control) && capright) {
+                if ((!(p & mask6))/* || self.pinDirection == DIAGONALRIGHT*/) {
+                    addMove(px, py, 1, m, 1);
+                    //var move = new Move(px, py, 1, m)
                     //move.isCapture = true
-                    //move.captureType = captureType=board[self.x + 1][self.y + m].type
+                    //move.captureType = captureType=board[px + 1][py + m].type
                     //plm.push(move)
                 }
             }
         }
-        if (board[self.x][self.y + m] == 0 && !control) {
-            if (self.y == (self.color == 0 ? 6 : 1)) {
-                if ((!self.pinned) || self.pinDirection == VERTICAL) {
-                    addMove(self.x, self.y, 0, m, 1);
-                    //plm.push(new Move(self.x, self.y, 0, m, isPromotion=true, promoteTo=QUEEN))
-                    //plm.push(new Move(self.x, self.y, 0, m, isPromotion=true, promoteTo=KNIGHT))
-                    //plm.push(new Move(self.x, self.y, 0, m, isPromotion=true, promoteTo=ROOK))
-                    //plm.push(new Move(self.x, self.y, 0, m, isPromotion=true, promoteTo=BISHOP))
+        if (board[px][py + m] == 0 && !control) {
+            if (py == ((p & mask1) == 0 ? 6 : 1)) {
+                if ((!(p & mask6))/* || self.pinDirection == VERTICAL*/) {
+                    addMove(px, py, 0, m, 1);
+                    //plm.push(new Move(px, py, 0, m, isPromotion=true, promoteTo=QUEEN))
+                    //plm.push(new Move(px, py, 0, m, isPromotion=true, promoteTo=KNIGHT))
+                    //plm.push(new Move(px, py, 0, m, isPromotion=true, promoteTo=ROOK))
+                    //plm.push(new Move(px, py, 0, m, isPromotion=true, promoteTo=BISHOP))
                 }
             }
             else {
-                if ((!self.pinned) || self.pinDirection == VERTICAL) {
-                    addMove(self.x, self.y, 0, m, 0);
-                    //plm.push(new Move(self.x, self.y, 0, m))
+                if ((!(p & mask6))/* || self.pinDirection == VERTICAL*/) {
+                    addMove(px, py, 0, m, 0);
+                    //plm.push(new Move(px, py, 0, m))
                 }
             }
         }
         // First new Move 2 spaces
-        if (!self.hasMoved && board[self.x][self.y + m] == 0 && board[self.x][self.y + 2*m] == 0 && self.y == (self.color == 0 ? 1 : 6) && !control) {
-            if ((!self.pinned) || self.pinDirection == VERTICAL) {
-                addMove(self.x, self.y, 0, 2*m, 0);
-                //var move = new Move(self.x, self.y, 0, 2*m)
+        if (!(p & mask5) && board[px][py + m] == 0 && board[px][py + 2*m] == 0 && py == ((p & mask1) == 0 ? 1 : 6) && !control) {
+            if ((!(p & mask6))/* || self.pinDirection == VERTICAL*/) {
+                addMove(px, py, 0, 2*m, 0);
+                //var move = new Move(px, py, 0, 2*m)
                 //move.enpassantable = true
                 //plm.push(move)
             }
@@ -534,76 +594,78 @@ extern "C" {
         // En Passant
         // TODO: this ^
         /*
-        if (self.y == 4 && board.moveList.length > 0 && board.moveList[board.moveList.length - 1].enpassantable && !control) {
-            if (self.x == 0 && board.moveList[-board.moveList.length - 1].x == 1) {
-                var move = new Move(self.x, self.y, 1, m)
+        if (py == 4 && board.moveList.length > 0 && board.moveList[board.moveList.length - 1].enpassantable && !control) {
+            if (px == 0 && board.moveList[-board.moveList.length - 1].x == 1) {
+                var move = new Move(px, py, 1, m)
                 move.isEnPassant = true
                 plm.push()
             }
-            else if (self.x == 7 && board.moveList[board.moveList.length - 1].x == 6) {
-                var move = new Move(self.x, self.y, -1, m)
+            else if (px == 7 && board.moveList[board.moveList.length - 1].x == 6) {
+                var move = new Move(px, py, -1, m)
                 move.isEnPassant = true
                 plm.push(move)
             }
-            else if (board.moveList[board.moveList.length - 1].x == self.x + 1) {
-                var move = new Move(self.x, self.y, 1, m)
+            else if (board.moveList[board.moveList.length - 1].x == px + 1) {
+                var move = new Move(px, py, 1, m)
                 move.isEnPassant = true
                 plm.push(move)
             }
-            else if (board.moveList[board.moveList.length - 1].x == self.x - 1) {
-                var move = new Move(self.x, self.y, -1, m)
+            else if (board.moveList[board.moveList.length - 1].x == px - 1) {
+                var move = new Move(px, py, -1, m)
                 move.isEnPassant = true
                 plm.push(move)
             }
         }*/
     }
 
-    int* generateMoves(Piece self, bool ignoreCheck=false, bool control=false) {
+    int* generateMoves(int px, int py, bool ignoreCheck=false, bool control=false) {
         moves = {};
-        if (self.type == PAWN) {
+        int p = board[px][py];
+        if ((p & pieceMask) == PAWN) {
             bool capLeft = true;
             bool capRight = true;
-            if (self.pinned) {
+            if (p & mask6) {
+                /*
                 if (self.pinDirection == DIAGONALRIGHT) {
                     capRight = false;
                 }
                 if (self.pinDirection == DIAGONALLEFT) {
                     capLeft = false;
-                }
+                }*/
             }
-            calcPawn(self, capLeft, capRight, control);
+            calcPawn(p, px, py, capLeft, capRight, control);
         }
-        else if (self.type == ROOK) {
-            if (self.pinned && (self.pinDirection == DIAGONALLEFT || self.pinDirection == DIAGONALRIGHT)) {
+        else if ((p & pieceMask) == ROOK) {
+            if ((p & mask6) /*&& (self.pinDirection == DIAGONALLEFT || self.pinDirection == DIAGONALRIGHT)*/) {
                 return &(arr[0]);
             }
             else {
-                calcRook(self, {}, control);
+                calcRook(p, px, py, control);
             }
         }
-        else if (self.type == QUEEN) {
-            calcBishop(self, {}, control);
-            calcRook(self, {}, control);
+        else if ((p & pieceMask) == QUEEN) {
+            calcBishop(p, px, py, control);
+            calcRook(p, px, py, control);
         }
-        else if (self.type == BISHOP) {
-            if (self.pinned && (self.pinDirection == HORIZONTAL || self.pinDirection == VERTICAL)) {
+        else if ((p & pieceMask) == BISHOP) {
+            if ((p & mask6) /*&& (self.pinDirection == HORIZONTAL || self.pinDirection == VERTICAL)*/) {
                 return &(arr[0]);
             }
             else {
-                calcBishop(self, {}, control);
+                calcBishop(p, px, py, control);
             }
         }
-        else if (self.type == KNIGHT) {
-            if (self.pinned) {
+        else if ((p & pieceMask) == KNIGHT) {
+            if (p & mask6) {
                 return &(arr[0]);
             }
             else {
-                calcKnight(self, control);
+                calcKnight(p, px, py, control);
             }
         }
-        else if (self.type == KING) {
+        else if ((p & pieceMask) == KING) {
             //var notChecked = []
-            calcKing(self);
+            calcKing(p, px, py);
             /*for (const move of notChecked) {
                 var x = move.x + move.dx
                 var y = move.y + move.dy
@@ -639,7 +701,7 @@ extern "C" {
             }*/
         }
         /*
-        if (!ignoreCheck && !(self.type == KING)) {
+        if (!ignoreCheck && !((p & pieceMask) == KING)) {
             if (board.checks[board.turn]) {
                 var checkStop = []
                 for (const move of plm) {
@@ -668,8 +730,12 @@ extern "C" {
         return &(arr[0]);
     }
 
-    void reset() {
-        calcKnight(testPiece, {});
+    void reset(int px, int py, bool control) {
+        generateMoves(px, py, control);
+    }
+
+    void createPiece(int p, int px, int py) {
+        board[px][py] = p;
     }
 
     int* getBoardOffset() {

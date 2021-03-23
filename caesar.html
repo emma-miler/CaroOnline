@@ -4,23 +4,27 @@
       const file = await response.arrayBuffer();
       const wasm = await WebAssembly.instantiate(file);
       const { memory, addMove, getMoveAmount, getData, generatePiece, reset, getBoardOffset } = wasm.instance.exports;
-        //addMove(1,2,3,4);
-        //addMove(5,6,7,8);
-        var tp = generatePiece(0, 0, 0, false);
         const startTime = window.performance.now()
-        reset()
+        reset(0b00001101, 7, 7, true)
         console.log(((window.performance.now() - startTime)/100000 * 1000).toString().substring(0, 5))
         const moves = getMoveAmount()
-        //console.log(moves)
+        console.log(moves)
 
-        //var offset = getData();
-        //console.log(offset)
+        var offset = getData();
+        console.log(offset)
 
-        //var linearMemory = new Int32Array(memory.buffer, 0, moves * 5);
+        var linearMemory = new Int32Array(memory.buffer, 0, moves * 5);
 
-        //for (var i = 0; i < linearMemory.length / 5; i++) {
-        //    console.log(linearMemory[i * 5].toString() + linearMemory[i * 5 + 1].toString() + linearMemory[i * 5 + 2].toString() + linearMemory[i * 5 + 3].toString() + linearMemory[i * 5 + 4].toString());
-        //}
+        for (var i = 0; i < linearMemory.length / 5; i++) {
+            var z = document.createElement("div")
+            document.body.appendChild(z)
+            z.innerHTML = (
+              linearMemory[i * 5].toString() + " " + 
+              linearMemory[i * 5 + 1].toString() + " " + 
+              linearMemory[i * 5 + 2].toString() + " " + 
+              linearMemory[i * 5 + 3].toString() + " " + 
+              linearMemory[i * 5 + 4].toString());
+        }
 
         
         var offset = getBoardOffset();
@@ -28,12 +32,10 @@
 
         var linearMemory = new Int32Array(memory.buffer, offset, 64);
 
-        linearMemory[0][0] = 128
-
-        var linearMemory = new Int32Array(memory.buffer, offset, 64);
-
         for (var x = 0; x < 8; x++) {
-            console.log(
+            var z = document.createElement("div")
+            document.body.appendChild(z)
+            z.innerHTML = (
                 linearMemory[x*8 + 0].toString() +
                 linearMemory[x*8 + 1].toString() +
                 linearMemory[x*8 + 2].toString() +
