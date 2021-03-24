@@ -126,7 +126,7 @@ class Board {
         this.response = await fetch("caesar.wasm");
         this.file = await this.response.arrayBuffer();
         this.wasm = await WebAssembly.instantiate(this.file);
-        const { memory, addMove, getMoveAmount, getData, getBoardOffset, writeRow, generateMoves, performMove } = this.wasm.instance.exports;
+        const { memory, addMove, getMoveAmount, getData, getBoardOffset, writeRow, generateMoves, performMove, calcControl } = this.wasm.instance.exports;
         this.memory = memory
         this.addMove = addMove
         this.getMoveAmount = getMoveAmount
@@ -135,6 +135,7 @@ class Board {
         this.writeRow = writeRow
         this.WASMgenerateMoves = generateMoves
         this.WASMperformMove = performMove
+        this.calcControl = calcControl
         this.updateBoard()
         gui.draw()
     }
@@ -147,6 +148,25 @@ class Board {
                 this.grid[x][y] = boardMemory[y*8 + x]
             }
         }
+    }
+
+    readControl(color) {
+        // MARK: control
+        this.controlled[color] = []
+        var moves = this.calcControl(color)
+        var offset = this.getData();
+        var linearMemory = new Int32Array(this.memory.buffer, offset, moves * 5);
+        for (var i = 0; i < linearMemory.length / 5; i++) {
+            var x = linearMemory[i * 5]
+            var y = linearMemory[i * 5 + 1]
+            var dx = linearMemory[i * 5 + 2]
+            var dy = linearMemory[i * 5 + 3]
+            var square = JSON.stringify([x + dx, y + dy])
+            if (this.controlled[color].indexOf(square) == -1) {
+                this.controlled[color].push(square)
+            }
+        }
+        gui.draw()
     }
 
     setup() {
@@ -308,8 +328,8 @@ class graphicsHandler {
 
         this.ranks = ["a", "b", "c", "d", "e", "f", "g", "h"]
 
-        this.lightBrush = "#FFFFFF"
-        this.darkBrush = "#1a2737"
+        this.lightBrush = "#FFFFFF60"
+        this.darkBrush = "#1a2737D0"
 
         this.selected = 0
 
@@ -415,7 +435,8 @@ class graphicsHandler {
 
     }
 
-    draw(testMoves=[], piece=0) {
+    draw(piece=0) {
+        // MARK: draw
         this.p = this.canvas.getContext("2d")
         let h = window.innerHeight
         this.canvas.height = h
@@ -427,10 +448,11 @@ class graphicsHandler {
         var sp = 60 / s
 
         this.p.fillStyle = "rgba(40, 40, 40, 1)"
-        this.p.fillRect(0, 0, h, h)
+        //this.p.fillRect(0, 0, h, h)
 
         this.p.fillStyle = this.lightBrush;
         this.p.fillRect(0, vo, bh, bh)
+
         for (var x = 0; x < 4; x++) {
             for (var y = 0; y < 8; y++) {
                 if (y % 2 == 0){ o = s; }
@@ -475,14 +497,15 @@ class graphicsHandler {
         }
 
         // Controlled Squares
-        /*
+        
         this.p.fillStyle = "rgba(255, 32, 32, 0.5)"
-        for (const move of this.board.controlled[board.turn == 0 ? 1 : 0]) {
-            var x = move.x + move.dx
-            var y = move.y + move.dy
+        for (const move of this.board.controlled[1]) {
+            var square = JSON.parse(move)
+            var x = square[0]
+            var y = square[1]
             if (this.flipped) {this.p.fillRect(s * (7-x), s * y + vo, s+1, s+1)}
             else {this.p.fillRect(s * x, s * (7-y) + vo, s+1, s+1)}
-        }*/
+        }
 
         if (this.selected != 0) {
             print("testHERE")
@@ -511,16 +534,6 @@ class graphicsHandler {
             }
         }
         //this.p.drawImage(this.image, source[0], source[1], 150, 150, piece.x * s, (7-piece.y) * s + vo, s, s)
-        // Render test moves
-        this.p.fillStyle = "rgba(255, 32, 32, 0.5)"
-        for (const move of testMoves) {
-            x = move.x + move.dx
-            y = move.y + move.dy
-            this.p.beginPath()
-            if (this.flipped) {this.p.arc(s * (7-x) + s/2, y * s + s/2 + vo, s/4, 0, 2 * Math.PI, false)}
-            else {this.p.arc(s * x + s/2, (7 - y) * s + s/2 + vo, s/4, 0, 2 * Math.PI, false)}
-            this.p.fill()
-        }
 
         var adv = 0
         for(var i = 0; i < this.board.players[0].taken.length; i++) {

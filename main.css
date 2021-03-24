@@ -1,5 +1,7 @@
 body {
     background-color: rgb(40, 40, 40);
+    background-image: url("https://i.ytimg.com/vi/41vuqCTd2-U/maxresdefault.jpg");
+    background-size: cover;
     overflow: hidden;
     font-family: Arial, Helvetica, sans-serif;
 }

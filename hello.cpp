@@ -49,6 +49,9 @@ int previousMoveFlags = 0b000000000000;
 // Bit 7: en passantable
 // Bit 8-11: capture data
 
+int localCounter = 0;
+int oldMoveCount = 0;
+
 int board[8][8] = {
     {9, 21, 0, 0, 0, 0, 23, 11},
     {13, 21, 0, 0, 0, 0, 23, 15},
@@ -610,7 +613,9 @@ extern "C" {
     }
 
     int* generateMoves(int px, int py, bool ignoreCheck=false, bool control=false) {
-        moves = {};
+        if (!control) {
+            moves = 0;
+        }
         int p = board[px][py];
         if ((p & pieceMask) == PAWN) {
             bool capLeft = true;
@@ -762,5 +767,20 @@ extern "C" {
         board[rowNumber][5] = data6;
         board[rowNumber][6] = data7;
         board[rowNumber][7] = data8;
+    }
+
+    int calcControl(int color) {
+        localCounter = 0;
+        moves = 0;
+        for (int x = 0; x < 8; x++) {
+            for (int y = 0; y < 8; y++) {
+                if ((board[x][y] & mask0) && ((board[x][y] & mask1) >> 1) == color) {
+                    oldMoveCount = moves;
+                    generateMoves(x, y, false, true);
+                    localCounter += (moves - oldMoveCount);
+                }
+            }
+        }
+        return localCounter;
     }
 }
