@@ -499,7 +499,7 @@ class graphicsHandler {
         // Controlled Squares
         
         this.p.fillStyle = "rgba(255, 32, 32, 0.5)"
-        for (const move of this.board.controlled[1]) {
+        for (const move of this.board.controlled[0]) {
             var square = JSON.parse(move)
             var x = square[0]
             var y = square[1]
@@ -730,8 +730,8 @@ window.onload = function() {
         board.isOffline = true
     })
     
-    document.getElementById("overlay").style["display"] = "none"
-    board.isOffline = true
+    //document.getElementById("overlay").style["display"] = "none"
+    //board.isOffline = true
 
     //runCppTest()
 }
