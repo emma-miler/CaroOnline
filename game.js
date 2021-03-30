@@ -22,6 +22,17 @@ renderSources = [
     [750.0, 150.0, 150.0, 150.0]
 ]
 
+promotionSources = [
+    [0.0, 0.0, 150.0, 150.0],
+    [300.0, 0.0, 150.0, 150.0],
+    [450.0, 0.0, 150.0, 150.0],
+    [600.0, 0.0, 150.0, 150.0],
+    [0.0, 150.0, 150.0, 150.0],
+    [300.0, 150.0, 150.0, 150.0],
+    [450.0, 150.0, 150.0, 150.0],
+    [600.0, 150.0, 150.0, 150.0],
+]
+
 const typeMask =  0b00011100
 const colorMask = 0b00000010
 
@@ -126,7 +137,7 @@ class Board {
         this.response = await fetch("caesar.wasm");
         this.file = await this.response.arrayBuffer();
         this.wasm = await WebAssembly.instantiate(this.file);
-        const { memory, addMove, getMoveAmount, getData, getBoardOffset, writeRow, generateMoves, performMove, calcControl } = this.wasm.instance.exports;
+        const { memory, addMove, getMoveAmount, getData, getBoardOffset, writeRow, generateMoves, performMove, promoteMove, calcControl } = this.wasm.instance.exports;
         this.memory = memory
         this.addMove = addMove
         this.getMoveAmount = getMoveAmount
@@ -135,6 +146,7 @@ class Board {
         this.writeRow = writeRow
         this.WASMgenerateMoves = generateMoves
         this.WASMperformMove = performMove
+        this.WASMpromoteMove = promoteMove
         this.calcControl = calcControl
         this.updateBoard()
         gui.draw()
@@ -155,12 +167,12 @@ class Board {
         this.controlled[color] = []
         var moves = this.calcControl(color)
         var offset = this.getData();
-        var linearMemory = new Int32Array(this.memory.buffer, offset, moves * 5);
-        for (var i = 0; i < linearMemory.length / 5; i++) {
-            var x = linearMemory[i * 5]
-            var y = linearMemory[i * 5 + 1]
-            var dx = linearMemory[i * 5 + 2]
-            var dy = linearMemory[i * 5 + 3]
+        var linearMemory = new Int32Array(this.memory.buffer, offset, moves * 6);
+        for (var i = 0; i < linearMemory.length / 6; i++) {
+            var x = linearMemory[i * 6]
+            var y = linearMemory[i * 6 + 1]
+            var dx = linearMemory[i * 6 + 2]
+            var dy = linearMemory[i * 6 + 3]
             var square = JSON.stringify([x + dx, y + dy])
             if (this.controlled[color].indexOf(square) == -1) {
                 this.controlled[color].push(square)
@@ -243,6 +255,16 @@ class Board {
         gui.draw()
     }
 
+    promoteMove(move, fromOther=false) {
+        // MARK: promMove
+        print("Promotion")
+        print(move)
+        var taken = this.WASMpromoteMove(move.x, move.y, move.x+move.dx, move.y+move.dy, move.promoteTo)
+        print("Taken piece: " + taken)
+        this.updateBoard()
+        gui.draw()
+    }
+
     tickTurn() {
         this.turn = Color[Object.keys(Color)[this.turn + 1 < Object.keys(Color).length ? this.turn + 1 : 0]]
         this.pins[this.turn] = this.calcPins()
@@ -294,21 +316,36 @@ class Board {
         // MARK : genMoves
         this.WASMgenerateMoves(px, py, true)
         const moves = this.getMoveAmount()
-        console.log("Moves: " + moves)
+        //console.log("Moves: " + moves)
 
         var offset = this.getData();
         //console.log(offset)
 
-        var linearMemory = new Int32Array(this.memory.buffer, 0, moves * 5);
+        var linearMemory = new Int32Array(this.memory.buffer, 0, moves * 6);
         var testMoves = []
-        for (var i = 0; i < linearMemory.length / 5; i++) {
-            var x = linearMemory[i * 5]
-            var y = linearMemory[i * 5 + 1]
-            var dx = linearMemory[i * 5 + 2]
-            var dy = linearMemory[i * 5 + 3]
-            var isCap = linearMemory[i * 5 + 4] ? true : false
+        for (var i = 0; i < linearMemory.length / 6; i++) {
+            var x = linearMemory[i * 6]
+            var y = linearMemory[i * 6 + 1]
+            var dx = linearMemory[i * 6 + 2]
+            var dy = linearMemory[i * 6 + 3]
+            var promotionType = linearMemory[i * 6 + 5]
+            var promotion = false
+            if ((this.grid[y][x] & 0b10) > 1 == 0) {
+                if ((this.grid[y][x] & typeMask) == CPPType.PAWN && y == 6) {
+                    promotion = true
+                }
+            } 
+            else if ((this.grid[y][x] & 0b10) > 1 == 1) {
+                if ((this.grid[y][x] & typeMask) == CPPType.PAWN && y == 1) {
+                    promotion = true
+                }
+            } 
+            //print(promotion)
+            var isCap = linearMemory[i * 6 + 4] ? true : false
             //print(x + " " + y + " " + dx + " " + dy)
-            testMoves.push(new Move(x, y, dx, dy, isCap))
+            var move = new Move(x, y, dx, dy, isCap)
+            move.isPromotion = promotion
+            testMoves.push(move)
         }
         return testMoves
     }
@@ -340,6 +377,8 @@ class graphicsHandler {
         this.boardScale = 0.9
 
         this.flipped = false
+
+        this.promotionX = 0
 
         function moveTest(event) {
             this.draw()
@@ -377,7 +416,7 @@ class graphicsHandler {
 
             if (this.selected == 0) {
                 if (this.flipped) {
-                    if (board.grid[7-y][x] != 0) { this.selected = [7 - y, 7 - x] }
+                    if (board.grid[7-y][x] != 0) { this.selected = [y, 7 - x] }
                 }
                 else {
                     if (board.grid[7-y][x] != 0) { this.selected = [7 - y, x] }
@@ -387,32 +426,66 @@ class graphicsHandler {
             else {
                 var sx = this.selected[1]
                 var sy = this.selected[0]
-                print(this.selected)
                 var succes = false
-                // Generate moves and check if clicked square is legal
-                var attacks = this.board.calcPins()
-                print("X, Y: " + x + " " + (7-y))
-                for (const move of this.board.generateMoves(this.selected[1], this.selected[0])) {
-                    print(move)
-                    print((move.x + move.dx) + " " + (move.y + move.dy))
-                    if ((!this.flipped && x == sx + move.dx && 7-y == sy + move.dy) || (this.flipped && 7 - x == sx + move.dx && y == sy + move.dy)) {
-                        print("PERF MOVE HERE")
-                        print(move)
-                        if (move.isPromotion) {
-                            this.drawPromotionDialog = true
-                        }
-                        else {
-                            this.board.performMove(move)
+                if (this.drawPromotionDialog) {
+                    var color = (this.board.grid[sy][sx] & 0b10) > 1
+                    if (color == 1) {y = 7-y;}
+                    if (this.flipped) {y=7-y}
+                    if (x == sx) {
+                        var move = new Move(sx, sy, this.promotionX, color == 0 ? 1 : -1)
+                        //this.board.performMove(move)
+                        print("Y: " + y)
+                        if (y == 0) {
+                            move.promoteTo = CPPType.QUEEN
+                            this.board.promoteMove(move)
+                            this.drawPromotionDialog = false
                             this.selected = 0
                         }
-                        succes = true
-                        break
+                        else if (y == 1) {
+                            move.promoteTo = CPPType.ROOK
+                            this.board.promoteMove(move)
+                            this.drawPromotionDialog = false
+                            this.selected = 0
+                        }
+                        else if (y == 2) {
+                            move.promoteTo = CPPType.KNIGHT
+                            this.board.promoteMove(move)
+                            this.drawPromotionDialog = false
+                            this.selected = 0
+                        }
+                        else if (y == 3) {
+                            move.promoteTo = CPPType.BISHOP
+                            this.board.promoteMove(move)
+                            this.drawPromotionDialog = false
+                            this.selected = 0
+                        }
+                        this.board.updateBoard()
+                        this.draw()
+
                     }
                 }
-                if (!succes) {
-                    this.selected = this.board.grid[x][7 - y]
-                    if (this.selected != 0 && this.selected.color != this.board.turn) {
-                        this.selected = 0
+                else {
+                    // Generate moves and check if clicked square is legal
+                    var attacks = this.board.calcPins()
+                    for (const move of this.board.generateMoves(this.selected[1], this.selected[0])) {
+                        if ((!this.flipped && x == sx + move.dx && 7-y == sy + move.dy) || (this.flipped && 7 - x == sx + move.dx && y == sy + move.dy)) {
+                            if (move.isPromotion) {
+                                this.drawPromotionDialog = true
+                                this.promotionX = move.dx
+                            }
+                            else {
+                                this.board.performMove(move)
+                                this.selected = 0
+                            }
+                            succes = true
+                            break
+                        }
+                    }
+                    if (!succes) {
+                        this.selected = this.board.grid[x][7 - y]
+                        if (this.selected != 0 && this.selected.color != this.board.turn) {
+                            this.selected = 0
+                        }
                     }
                 }
             }
@@ -435,7 +508,7 @@ class graphicsHandler {
 
     }
 
-    draw(piece=0) {
+    draw() {
         // MARK: draw
         this.p = this.canvas.getContext("2d")
         let h = window.innerHeight
@@ -453,6 +526,7 @@ class graphicsHandler {
         this.p.fillStyle = this.lightBrush;
         this.p.fillRect(0, vo, bh, bh)
 
+        // Draw board
         for (var x = 0; x < 4; x++) {
             for (var y = 0; y < 8; y++) {
                 if (y % 2 == 0){ o = s; }
@@ -461,6 +535,8 @@ class graphicsHandler {
                 this.p.fillRect(s*2*x+o, s*y + vo, s, s)
             }
         }
+
+        // Draw player info
         for (var x = 0; x < 8; x++) {
             this.p.font = (s * 0.25).toString() + "px Arial"
             this.p.fillStyle = x % 2 == 0 ? "white" : "black"
@@ -479,10 +555,10 @@ class graphicsHandler {
         if (this.selected != 0) {
             this.p.fillStyle = "rgba(128, 0, 128, 0.5)"
             if (this.selected.color != Color.WHITE && !this.board.godMode) {
-                this.p.fillStyle = "rgba(255, 16, 16, 0.5)"
+                this.p.fillStyle = "rgba(128, 0, 128, 0.5)"
             }
-            if (this.flipped) {this.p.fillRect(s * (7-this.selected.x), s * this.selected.y + vo, s, s)}
-            else {this.p.fillRect(s * this.selected.x, s * (7 - this.selected.y) + vo, s, s)}
+            if (this.flipped) {this.p.fillRect(s * (7-this.selected[1]), s * this.selected[0] + vo, s, s)}
+            else {this.p.fillRect(s * this.selected[1], s * (7 - this.selected[0]) + vo, s, s)}
         }
 
         this.p.fillStyle = "rgba(255, 32, 32, 0.5)"
@@ -497,7 +573,6 @@ class graphicsHandler {
         }
 
         // Controlled Squares
-        
         this.p.fillStyle = "rgba(255, 32, 32, 0.5)"
         for (const move of this.board.controlled[0]) {
             var square = JSON.parse(move)
@@ -507,11 +582,11 @@ class graphicsHandler {
             else {this.p.fillRect(s * x, s * (7-y) + vo, s+1, s+1)}
         }
 
+        // Draw moves
         if (this.selected != 0) {
-            print("testHERE")
             this.p.fillStyle = "rgba(128, 0, 128, 0.5)"
             if (this.selected.color != Color.WHITE && !this.board.godMode) {
-                this.p.fillStyle = "rgba(255, 16, 16, 0.5)"
+                this.p.fillStyle = "rgba(128, 0, 128, 0.5)"
             }
             for (const move of this.board.generateMoves(this.selected[1], this.selected[0])) {
                 x = move.x + move.dx
@@ -542,9 +617,8 @@ class graphicsHandler {
         for(var i = 0; i < this.board.players[1].taken.length; i++) {
             adv -= PValues[this.board.players[1].taken[i]];
         }
-        //print("ADV:")
-        //print(adv)
 
+        // Draw player info
         if (this.flipped) {
             this.p.fillStyle = "black"
             var t = (1-this.boardScale) * h / 2.5
@@ -605,6 +679,35 @@ class graphicsHandler {
             else if (adv < 0) {
                 this.p.fillText(adv.toString().replace("-", "+ "), so + 1.75*t + (t*0.75)*this.board.players[1].taken.length, vo - t/2.5)
             }
+        }
+        
+        if (this.drawPromotionDialog) {
+            //var pieceType = this.board.grid[this.selected[0]][this.selected[1]] & typeMask
+//            if ((pieceType & typeMask) == CPPType.PAWN) {
+                this.p.fillStyle = "rgba(0, 0, 0, 0.5)"
+                this.p.fillRect(0, 0, h, h)
+                this.p.fillStyle = "rgba(255, 255, 255, 0.5)"
+                var x = this.selected[0]
+                var y = this.selected[1]
+
+                print(this.board.grid[x][y])
+                if ((this.board.grid[x][y] & 0b10) > 1  == 0) {
+                    if (this.flipped) {this.p.fillRect(s*(7-y), h - vo - 4*s, s, 4*s)}
+                    else { this.p.fillRect(s*y, vo, s, 4*s) }
+                    for (var z = 0; z < 4; z++) {
+                        if (this.flipped) { this.p.drawImage(this.image, promotionSources[z][0], promotionSources[z][1], 150, 150, (7-y) * s, h - (z+1)*s - vo, 60 / sp, 60 / sp) }
+                        else { this.p.drawImage(this.image, promotionSources[z][0], promotionSources[z][1], 150, 150, y * s, vo + z*s, 60 / sp, 60 / sp) }
+                    }
+                }
+                else if ((this.board.grid[x][y] & 0b10) > 1  == 1) {
+                    if (this.flipped) {this.p.fillRect(s*(7-y), vo, s, 4*s)}
+                    else { this.p.fillRect(s*y, h - vo - 4*s, s, 4*s) }
+                    for (var z = 0; z < 4; z++) {
+                        if (this.flipped) { this.p.drawImage(this.image, promotionSources[z+4][0], promotionSources[z+4][1], 150, 150, y * s, vo + z*s, 60 / sp, 60 / sp) }
+                        else { this.p.drawImage(this.image, promotionSources[z+4][0], promotionSources[z+4][1], 150, 150, y * s, h - (z+1)*s - vo, 60 / sp, 60 / sp) }
+                    }
+                }
+//            }
         }
     }
 }
@@ -768,19 +871,6 @@ function runPerformanceTest1() {
     print("\n\n")
 }
 
-function runPerformanceTest() {
-    const timer = document.getElementById('stopwatch');
-    var initTime = window.performance.now()
-    var iter = 100000
-    const piece = board.grid[4][3]
-    for (var x = 0; x < iter; x++) {
-        generateMoves(piece, board)
-    }
-    var endTime = window.performance.now()
-    timer.innerHTML = ((endTime - initTime)/iter * 1000).toString().substring(0, 5)
-    print("\n\n")
-}
-
 async function runCppTest() {
     const response = await fetch("caesar.wasm");
     const file = await response.arrayBuffer();
@@ -814,7 +904,7 @@ async function runCppTest() {
     var offset = getData();
     //console.log(offset)
 
-    var linearMemory = new Int32Array(memory.buffer, 0, moves * 5);
+    var linearMemory = new Int32Array(memory.buffer, 0, moves * 6);
     
     /*for (var i = 0; i < linearMemory.length / 5; i++) {
         var x= (
@@ -856,12 +946,12 @@ async function runCppTest() {
     //console.log("JS: " + (jEnd - jStart))
 
     var testMoves = []
-    for (var i = 0; i < linearMemory.length / 5; i++) {
-        var x = linearMemory[i * 5]
-        var y = linearMemory[i * 5 + 1]
-        var dx = linearMemory[i * 5 + 2]
-        var dy = linearMemory[i * 5 + 3]
-        var isCap = linearMemory[i * 5 + 4] ? true : false
+    for (var i = 0; i < linearMemory.length / 6; i++) {
+        var x = linearMemory[i * 6]
+        var y = linearMemory[i * 6 + 1]
+        var dx = linearMemory[i * 6 + 2]
+        var dy = linearMemory[i * 6 + 3]
+        var isCap = linearMemory[i * 6 + 4] ? true : false
         //print(x + " " + y + " " + dx + " " + dy)
         testMoves.push(new Move(x, y, dx, dy, isCap))
     }

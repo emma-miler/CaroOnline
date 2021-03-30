@@ -97,12 +97,13 @@ struct Piece testPiece;
 
 typedef long int i32;
 extern "C" {
-    void addMove(int x, int y, int dx, int dy, int isCapture=0) { 
-        arr[moves * 5] = x;
-        arr[moves * 5 + 1] = y;
-        arr[moves * 5 + 2] = dx;
-        arr[moves * 5 + 3] = dy;
-        arr[moves * 5 + 4] = isCapture;
+    void addMove(int x, int y, int dx, int dy, int isCapture=0, int promotion=0) { 
+        arr[moves * 6] = x;
+        arr[moves * 6 + 1] = y;
+        arr[moves * 6 + 2] = dx;
+        arr[moves * 6 + 3] = dy;
+        arr[moves * 6 + 4] = isCapture;
+        arr[moves * 6 + 5] = promotion;
         moves++;
     }
     int getMoveAmount() {
@@ -576,7 +577,11 @@ extern "C" {
         if (board[px][py + m] == 0 && !control) {
             if (py == ((p & mask1) == 0 ? 6 : 1)) {
                 if ((!(p & mask6))/* || self.pinDirection == VERTICAL*/) {
-                    addMove(px, py, 0, m, 1);
+                    addMove(px, py, 0, m, 0, 1);
+                    //addMove(px, py, -1, m, 0, 0);
+                    //addMove(px, py, -1, m, 0, 1);
+                    //addMove(px, py, -1, m, 0, 2);
+                    //addMove(px, py, -1, m, 0, 3);
                     //plm.push(new Move(px, py, 0, m, isPromotion=true, promoteTo=QUEEN))
                     //plm.push(new Move(px, py, 0, m, isPromotion=true, promoteTo=KNIGHT))
                     //plm.push(new Move(px, py, 0, m, isPromotion=true, promoteTo=ROOK))
@@ -754,6 +759,16 @@ extern "C" {
         else {
             previousMoveFlags &= (1u << 7); // Clear en passantable flag
         }
+        board[oldX][oldY] = 0;
+        return returnValue;
+    }
+
+    int promoteMove(int oldX, int oldY, int newX, int newY, int promotionType) {
+        int returnValue = board[newX][newY];
+        board[newX][newY] = board[oldX][oldY] - (board[oldX][oldY] & pieceMask) + promotionType;
+        previousMoveFlags = 0;
+        previousMoveFlags |= newX;
+        previousMoveFlags |= newY << 3;
         board[oldX][oldY] = 0;
         return returnValue;
     }
