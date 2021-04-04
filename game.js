@@ -134,22 +134,28 @@ class Board {
     }
 
     async init() {
+        // MARK: init
         this.response = await fetch("caesar.wasm");
         this.file = await this.response.arrayBuffer();
         this.wasm = await WebAssembly.instantiate(this.file);
-        const { memory, addMove, getMoveAmount, getData, getBoardOffset, writeRow, generateMoves, performMove, promoteMove, calcControl } = this.wasm.instance.exports;
+        const { memory, addMove, getMoveAmount, getData, getTest, getControlData, getBoardOffset, writeRow, generateMoves, performMove, promoteMove, calcControl, calcCheckDefenseSquares } = this.wasm.instance.exports;
         this.memory = memory
         this.addMove = addMove
         this.getMoveAmount = getMoveAmount
         this.getData = getData
+        this.getControlData = getControlData
         this.getBoardOffset = getBoardOffset
         this.writeRow = writeRow
         this.WASMgenerateMoves = generateMoves
         this.WASMperformMove = performMove
         this.WASMpromoteMove = promoteMove
         this.calcControl = calcControl
+        this.calcCheckDefenseSquares = calcCheckDefenseSquares
+        this.getTest = getTest
+        this.setup()
         this.updateBoard()
         gui.draw()
+        this.readControl(1)
     }
 
     updateBoard() {
@@ -181,6 +187,30 @@ class Board {
         gui.draw()
     }
 
+    calcCheckStop(color) {
+        // MARK: control
+        this.checkstop = []
+        var moves = this.calcCheckDefenseSquares(color)
+        var offset = this.getTest();
+        if (moves > 0) {
+            var linearMemory = new Int32Array(this.memory.buffer, offset, moves * 2);
+            for (var i = 0; i < linearMemory.length / 2; i++) {
+                var x = linearMemory[i * 2]
+                var y = linearMemory[i * 2 + 1]
+                //var square = JSON.stringify([x + dx, y + dy])
+                //if (this.controlled[color].indexOf(square) == -1) {
+                //    this.controlled[color].push(square)
+                //}
+                print(x + " " + y)
+            }
+            gui.draw()
+        }
+        else {
+            print("NO MOVES!")
+            print(moves)
+        }
+    }
+
     setup() {
         this.turn = Color.BLACK
         this.checks = [false, false]
@@ -200,7 +230,6 @@ class Board {
             [0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,0],
         ]
-        this.tickTurn()
     }
 
     performMove1(move, fromOther=false) {
@@ -249,8 +278,10 @@ class Board {
         // MARK: perfMove
         print("TEST123")
         print(move)
-        var taken = this.WASMperformMove(move.x, move.y, move.x+move.dx, move.y+move.dy)
+        var special = (move.isCastleShort || move.isCastleLong || move.isEnPassant)
+        var taken = this.WASMperformMove(move.x, move.y, move.x+move.dx, move.y+move.dy, special)
         print("Taken piece: " + taken)
+        this.tickTurn()
         this.updateBoard()
         gui.draw()
     }
@@ -269,8 +300,7 @@ class Board {
         this.turn = Color[Object.keys(Color)[this.turn + 1 < Object.keys(Color).length ? this.turn + 1 : 0]]
         this.pins[this.turn] = this.calcPins()
         this.controlled = [[], []]
-        this.controlled[0] = calcControl(Color.WHITE, this)
-        this.controlled[1] = calcControl(Color.BLACK, this)
+        this.readControl(this.turn)
         this.checkStopSquares[this.turn] = calcCheckDefenseSquares(this)
     }
 
@@ -321,15 +351,19 @@ class Board {
         var offset = this.getData();
         //console.log(offset)
 
-        var linearMemory = new Int32Array(this.memory.buffer, 0, moves * 6);
+        var linearMemory = new Int32Array(this.memory.buffer, offset, moves * 6);
         var testMoves = []
         for (var i = 0; i < linearMemory.length / 6; i++) {
             var x = linearMemory[i * 6]
             var y = linearMemory[i * 6 + 1]
             var dx = linearMemory[i * 6 + 2]
             var dy = linearMemory[i * 6 + 3]
-            var promotionType = linearMemory[i * 6 + 5]
+            var isCapture = linearMemory[i * 6 + 4]
+            var specialFlag = linearMemory[i * 6 + 5]
             var promotion = false
+            if (x == 0 && y == 0 && dx == 0 && dy == 0) {
+                continue
+            }
             if ((this.grid[y][x] & 0b10) > 1 == 0) {
                 if ((this.grid[y][x] & typeMask) == CPPType.PAWN && y == 6) {
                     promotion = true
@@ -344,9 +378,20 @@ class Board {
             var isCap = linearMemory[i * 6 + 4] ? true : false
             //print(x + " " + y + " " + dx + " " + dy)
             var move = new Move(x, y, dx, dy, isCap)
+            if (specialFlag) {
+                if ((board.grid[y][x] & typeMask) == CPPType.KING) {
+                    if (dx == 2) {
+                        move.isCastleShort = true
+                    }
+                    else if (dx == -2) {
+                        move.isCastleLong = true
+                    }
+                }
+            }
             move.isPromotion = promotion
             testMoves.push(move)
         }
+
         return testMoves
     }
 }
@@ -574,6 +619,14 @@ class graphicsHandler {
 
         // Controlled Squares
         this.p.fillStyle = "rgba(255, 32, 32, 0.5)"
+        for (const move of this.board.controlled[1]) {
+            var square = JSON.parse(move)
+            var x = square[0]
+            var y = square[1]
+            if (this.flipped) {this.p.fillRect(s * (7-x), s * y + vo, s+1, s+1)}
+            else {this.p.fillRect(s * x, s * (7-y) + vo, s+1, s+1)}
+        }
+        this.p.fillStyle = "rgba(32, 255, 32, 0.5)"
         for (const move of this.board.controlled[0]) {
             var square = JSON.parse(move)
             var x = square[0]
@@ -833,8 +886,8 @@ window.onload = function() {
         board.isOffline = true
     })
     
-    //document.getElementById("overlay").style["display"] = "none"
-    //board.isOffline = true
+    document.getElementById("overlay").style["display"] = "none"
+    board.isOffline = true
 
     //runCppTest()
 }
@@ -869,92 +922,4 @@ function runPerformanceTest1() {
     var endTime = window.performance.now()
     timer.innerHTML = ((endTime - initTime)).toString().substring(0, 5)
     print("\n\n")
-}
-
-async function runCppTest() {
-    const response = await fetch("caesar.wasm");
-    const file = await response.arrayBuffer();
-    const wasm = await WebAssembly.instantiate(file);
-    const { memory, addMove, getMoveAmount, getData, generatePiece, reset, getBoardOffset, writeRow, createPiece } = wasm.instance.exports;
-
-    /*for (var y = 0; y < 8; y++) {
-        var s = [0, 0, 0, 0, 0, 0, 0, 0]
-        for (var x = 0; x < 8; x++) {
-            s[x] = 1 + (board.grid[x][y].color * 2) + (board.grid[x][y].type << 2) + (board.grid[x][y].hasMoved * 64)
-        }
-        console.log(s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7])
-        writeRow(y, s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7])
-    }*/
-
-    //writeRow(0, 0, 0, CPPType.KNIGHT + 1, 0, 0, 0, 0, 0)
-
-    const pieceType = CPPType.PAWN;
-    var px = 4
-    var py = 3
-    print(pieceType)
-
-    createPiece(pieceType + 1, px, py)
-    //createPiece(CPPType.KNIGHT + 3, px-1, py)
-
-    var cStart = window.performance.now()
-    reset(px, py, true)
-    const moves = getMoveAmount()
-    //console.log("Moves: " + moves)
-
-    var offset = getData();
-    //console.log(offset)
-
-    var linearMemory = new Int32Array(memory.buffer, 0, moves * 6);
-    
-    /*for (var i = 0; i < linearMemory.length / 5; i++) {
-        var x= (
-            linearMemory[i * 5].toString() + " " + 
-            linearMemory[i * 5 + 1].toString() + " " + 
-            linearMemory[i * 5 + 2].toString() + " " + 
-            linearMemory[i * 5 + 3].toString() + " " + 
-            linearMemory[i * 5 + 4].toString());
-    }*/
-    var cEnd = window.performance.now()
-
-    var offset = getBoardOffset();
-    //console.log(offset)
-
-    var boardMemory = new Int32Array(memory.buffer, offset, 64);
-
-    for (var x = 0; x < 8; x++) {
-        for (var y = 0; y < 8; y++) {
-            board.grid[x][y] = boardMemory[y*8 + x]
-        }
-        y = 7-x
-        /*console.log(
-            pad(boardMemory[y*8 + 0], 2) + " " +
-            pad(boardMemory[y*8 + 1], 2) + " " +
-            pad(boardMemory[y*8 + 2], 2) + " " +
-            pad(boardMemory[y*8 + 3], 2) + " " +
-            pad(boardMemory[y*8 + 4], 2) + " " +
-            pad(boardMemory[y*8 + 5], 2) + " " +
-            pad(boardMemory[y*8 + 6], 2) + " " +
-            pad(boardMemory[y*8 + 7], 2)
-        );*/
-    }
-
-
-    //var jStart = window.performance.now()
-    //generateMoves(board.grid[1][0], board)
-    //var jEnd = window.performance.now()
-    //console.log("C++: " + (cEnd - cStart))
-    //console.log("JS: " + (jEnd - jStart))
-
-    var testMoves = []
-    for (var i = 0; i < linearMemory.length / 6; i++) {
-        var x = linearMemory[i * 6]
-        var y = linearMemory[i * 6 + 1]
-        var dx = linearMemory[i * 6 + 2]
-        var dy = linearMemory[i * 6 + 3]
-        var isCap = linearMemory[i * 6 + 4] ? true : false
-        //print(x + " " + y + " " + dx + " " + dy)
-        testMoves.push(new Move(x, y, dx, dy, isCap))
-    }
-    gui.draw(testMoves, new Piece(JSType(pieceType), px, py))
-
 }

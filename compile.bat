@@ -1,1 +1,1 @@
-emcc -Os -s STANDALONE_WASM -s EXPORTED_FUNCTIONS="['_addMove', '_getMoveAmount', '_getData', '_getBoardOffset', '_writeRow', '_generateMoves', '_performMove', '_calcControl', '_promoteMove']" -Wl,--no-entry "hello.cpp" -o "caesar.wasm"
+emcc -Os -s STANDALONE_WASM -s EXPORTED_FUNCTIONS="['_addMove', '_getMoveAmount', '_getData', '_getControlData', '_getTest', '_getBoardOffset', '_writeRow', '_generateMoves', '_performMove', '_calcControl', '_promoteMove', '_calcCheckDefenseSquares']" -Wl,--no-entry "hello.cpp" -o "caesar.wasm"

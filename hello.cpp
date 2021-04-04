@@ -1,7 +1,18 @@
 #include <cstdint>
+#include <string.h>
+#include <iostream>
 int moves = 0;
-int *arr;
-int test[8];
+int arr[64 * 6];
+int controlMoves = 0;
+int controlArr[64 * 6];
+int testArr[128];
+
+int checkingPieces = 0;
+int checkingPieceToCapture[2] = {0,0};
+int checkStopMoves = 0;
+int checkStop[64 * 6];
+
+char *outputBuffer;
 
 // TODO: Fix castling
 // TODO: Fix pins
@@ -47,12 +58,14 @@ int previousMoveFlags = 0b000000000000;
 // Bit 3-5: y
 // Bit 6: capture
 // Bit 7: en passantable
-// Bit 8-11: capture data
+// Bit 8: castle short
+// Bit 9: castle long
+// Bit 10-14: capture data
 
 int localCounter = 0;
 int oldMoveCount = 0;
 
-int board[8][8] = {
+int board1[8][8] = {
     {9, 21, 0, 0, 0, 0, 23, 11},
     {13, 21, 0, 0, 0, 0, 23, 15},
     {17, 21, 0, 0, 0, 0, 23, 19},
@@ -62,6 +75,18 @@ int board[8][8] = {
     {13, 21, 0, 0, 0, 0, 23, 15},
     {9, 21, 0, 0, 0, 0, 23, 11}
 };
+
+int board[8][8] = {
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    {5, 0, 0, 0, 0, 0, 0, 11},
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 9, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0}
+};
+
 
 int offsets[8] = {0,0,0,0,0,0,0,0};
 
@@ -97,20 +122,33 @@ struct Piece testPiece;
 
 typedef long int i32;
 extern "C" {
-    void addMove(int x, int y, int dx, int dy, int isCapture=0, int promotion=0) { 
+    void addMove(int x, int y, int dx, int dy, int isCapture=0, int specialFlag=0) { 
         arr[moves * 6] = x;
         arr[moves * 6 + 1] = y;
         arr[moves * 6 + 2] = dx;
         arr[moves * 6 + 3] = dy;
         arr[moves * 6 + 4] = isCapture;
-        arr[moves * 6 + 5] = promotion;
+        arr[moves * 6 + 5] = specialFlag;
         moves++;
+    }
+    void addCheckstopMove(int x, int y) { 
+        checkStop[checkStopMoves * 2] = x;
+        checkStop[checkStopMoves * 2 + 1] = y;
+        checkStopMoves++;
     }
     int getMoveAmount() {
         return moves;
     }
     int* getData() {
         return &(arr[0]);
+    }
+
+    int* getControlData() {
+        return &(controlArr[0]);
+    }
+
+    int* getTest() {
+        return &(checkStop[0]);
     }
 
     void calcRook(int p, int px, int py, int sx=0, int sy=0, bool control=false, bool doSkip=false) {
@@ -491,56 +529,48 @@ extern "C" {
         }
 
         // Castling
-        if (!(p & mask5) && !checks[(p & mask1)] && false) {
+        if (!(p & mask5) && !checks[(p & mask1)]) {
             // White
             if ((p & mask1) == 0) {
                 // Short
                 int maybeRook = board[7][0];
                 if (maybeRook & mask0) {
-                    if ((maybeRook & mask2 & mask3 & mask4 == 2) && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == (p & mask1)) {
+                    if ((maybeRook & pieceMask) == ROOK && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == (p & mask1)) {
                         if (board[5][0] == 0 && board[6][0] == 0) {
-                            addMove(px, py, 2, 0, 1);
-                            //var move = new Move(px, py, 2, 0)
-                            //move.isCastleShort = true
-                            //plm.push(move)
+                            addMove(px, py, 2, 0, 0, 1);
                         }
                     }
+                }
 
-                    // Long
-                    int maybeRook = board[0][0];
-                    if ((maybeRook & mask2 & mask3 & mask4 == 2) && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == (p & mask1)) {
+                // Long
+                maybeRook = board[0][0];
+                if (maybeRook & mask0) {
+                    if ((maybeRook & pieceMask) == ROOK && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == (p & mask1)) {
                         if (board[1][0] == 0 && board[2][0] == 0 && board[3][0] == 0) {
-                            addMove(px, py, -2, 0, 1);
-                            //var move = new Move(px, py, -2, 0)
-                            //move.isCastleLong = true
-                            //plm.push(move)
+                            addMove(px, py, -2, 0, 0, 1);
                         }
                     }
                 }
             }
 
             // Black
-            else if ((p & mask1) == 1) {
+            if ((p & mask1) == 2) {
                 // Short
                 int maybeRook = board[7][7];
                 if (maybeRook & mask0) {
-                    if ((maybeRook & mask2 & mask3 & mask4 == 2) && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == (p & mask1)) {
+                    if ((maybeRook & pieceMask) == ROOK && (maybeRook & mask5) == 0 && (maybeRook & mask1) == (p & mask1)) {
                         if (board[5][7] == 0 && board[6][7] == 0) {
-                            addMove(px, py, 2, 0, 1);
-                            //var move = new Move(px, py, 2, 0)
-                            //move.isCastleShort = true
-                            //plm.push(move)
+                            addMove(px, py, 2, 0, 0, 1);
                         }
                     }
+                }
 
-                    // Long
-                    int maybeRook = board[0][7];
-                    if ((maybeRook & mask2 & mask3 & mask4 == 2) && (maybeRook & mask5) == 0 && (maybeRook & mask1)  == (p & mask1)) {
+                // Long
+                maybeRook = board[0][7];
+                if (maybeRook & mask0) {
+                    if ((maybeRook & pieceMask) == ROOK && (maybeRook & mask5) == 0 && (maybeRook & mask1) == (p & mask1)) {
                         if (board[1][7] == 0 && board[2][7] == 0 && board[3][7] == 0) {
-                            addMove(px, py, -2, 0, 1);
-                            //var move = new Move(px, py, -2, 0)
-                            //move.isCastleLong = true
-                            //plm.push(move)
+                            addMove(px, py, -2, 0, 0, 1);
                         }
                     }
                 }
@@ -618,6 +648,7 @@ extern "C" {
     }
 
     int* generateMoves(int px, int py, bool ignoreCheck=false, bool control=false) {
+        // MARK: genMoves
         if (!control) {
             moves = 0;
         }
@@ -665,69 +696,72 @@ extern "C" {
             }
         }
         else if ((p & pieceMask) == KING) {
-            //var notChecked = []
             calcKing(p, px, py);
-            /*for (const move of notChecked) {
-                var x = move.x + move.dx
-                var y = move.y + move.dy
-                var check = false
+            for (int i = 0; i < moves; i++) {
+                int x = arr[i*6] + arr[i*6 + 2];
+                int y = arr[i*6+1] + arr[i*6+3];
+                int special = arr[i*6+5];
+                bool check = false;
                 if (true) {
-                for (const controlled of board.controlled[board.turn == 0 ? 1 : 0]) {
-                    if (x == controlled.x + controlled.dx && y == controlled.y + controlled.dy) {
-                        check = true
-                        break
-                    } 
-                }
-                if (!check && move.isCastleShort) {
-                    for (const controlled of board.controlled[board.turn == 0 ? 1 : 0]) {
-                        if (x-1 == controlled.x + controlled.dx && y == controlled.y + controlled.dy) {
-                            check = true
-                            break
+                    for (int c = 0; c < controlMoves; c++) {
+                        if (x == (controlArr[c*6] + controlArr[c*6 + 2]) && y == (controlArr[c*6 + 1] + controlArr[c*6 + 3])) {
+                            check = true;
+                            break;
                         } 
                     }
-                }
-                if (!check && move.isCastleLong) {
-                    for (const controlled of board.controlled[board.turn == 0 ? 1 : 0]) {
-                        if (x+1 == controlled.x + controlled.dx && y == controlled.y + controlled.dy) {
-                            check = true
-                            break
-                        } 
+                    if (!check && special) {
+                        if (arr[i*6 + 2] == 2) {
+                            for (int c = 0; c < controlMoves; c++) {
+                                if (x-1 == (controlArr[c*6] + controlArr[c*6 + 2]) && y == (controlArr[c*6 + 1] + controlArr[c*6 + 3])) {
+                                    check = true;
+                                    break;
+                                }
+                            }
+                        }
+                        else if (arr[i*6 + 3] == -2) {
+                            for (int c = 0; c < controlMoves; c++) {
+                                if (x+1 == (controlArr[c*6] + controlArr[c*6 + 2]) && y == (controlArr[c*6 + 1] + controlArr[c*6 + 3])) {
+                                    check = true;
+                                    break;
+                                }
+                            }
+                        }
                     }
-                }
 
-                if (!check) {
-                    plm.push(move)
-                }
-            }
-            }*/
-        }
-        /*
-        if (!ignoreCheck && !((p & pieceMask) == KING)) {
-            if (board.checks[board.turn]) {
-                var checkStop = []
-                for (const move of plm) {
-                    var x = move.x + move.dx
-                    var y = move.y + move.dy
-                    for (const square of board.checkStopSquares) {
-                        if (square[0] == x && square[1] == y) {
-                            checkStop.push(move)
-                        }
-                    }
-                    for (const checkingPiece of board.checkPieces) {
-                        if (checkingPiece.x == x && checkingPiece == y) {
-                            checkStop.push(move)
+                    if (check) {
+                        for (int x = 0; x < 6; x++) {
+                            arr[i * 6 + x] = 0;
                         }
                     }
                 }
-                return checkStop
-            }
-            else {
-                return plm
             }
         }
-        else {
-            return plm
-        }*/
+        // TODO: fix this up
+        if (true) { //!ignoreCheck && !((p & pieceMask) == KING)
+            if (true) { //checks[(p & mask1) >> 1]
+                for (int i = 0; i < moves; i++) {
+                    int x = arr[i*6] + arr[i*6+2];
+                    int y = arr[i*6+1] + arr[i*6+3];
+                    bool isAllowed = true;
+                    if (checkingPieceToCapture[0] == x && checkingPieceToCapture[1] == y) {
+                        isAllowed = true;
+                    }
+                    else {
+                        for (int c = 0; c < checkStopMoves; c++) {
+                            if (checkStop[c*2] == x && checkStop[c*2+1] == y) {
+                                isAllowed = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!isAllowed) {
+                        for (int x = 0; x < 6; x++) {
+                            arr[i * 6 + x] = 0;
+                        }
+                    }
+                }
+            }
+        }
         return &(arr[0]);
     }
 
@@ -739,7 +773,8 @@ extern "C" {
         return &(board[0][0]);
     }
 
-    int performMove(int oldX, int oldY, int newX, int newY) {
+    int performMove(int oldX, int oldY, int newX, int newY, bool special=false) {
+        // MARK: performMove
         int returnValue = board[newX][newY];
         board[newX][newY] = board[oldX][oldY];
         if (previousMoveFlags & mask7) {
@@ -750,15 +785,32 @@ extern "C" {
                 board[newX][newY - 1] = 0;
             }
         }
+        if (special) {
+            if ((board[oldX][oldY] & pieceMask) == KING) {
+                if (newX - oldX == 2) {
+                    board[7][oldY] = 0;
+                    board[5][oldY] |= (1u << 0); // Set occupied flag
+                    board[5][oldY] |= board[oldX][oldY] & mask1; // Set color flag
+                    board[5][oldY] |= ROOK;
+                }
+                else if (newX - oldX == -2) {
+                    board[0][oldY] = 0;
+                    board[3][oldY] |= (1u << 0); // Set occupied flag
+                    board[3][oldY] |= board[oldX][oldY] & mask1; // Set color flag
+                    board[3][oldY] |= ROOK;
+                }
+            }
+        }
         previousMoveFlags = 0;
         previousMoveFlags |= newX;
         previousMoveFlags |= newY << 3;
         if ((board[oldX][oldY] & pieceMask) == PAWN && (oldY-newY == 2 || oldY-newY==-2)) {
-            previousMoveFlags |= (1u << 7); // Set en passantable flag
+            previousMoveFlags |= (1u << 7); // Set special flag
         }
         else {
-            previousMoveFlags &= (1u << 7); // Clear en passantable flag
+            previousMoveFlags &= (1u << 7); // Clear special flag
         }
+        board[newX][newY] |= (1u << 5); // Set hasMoved flag
         board[oldX][oldY] = 0;
         return returnValue;
     }
@@ -787,6 +839,7 @@ extern "C" {
     int calcControl(int color) {
         localCounter = 0;
         moves = 0;
+        controlMoves = 0;
         for (int x = 0; x < 8; x++) {
             for (int y = 0; y < 8; y++) {
                 if ((board[x][y] & mask0) && ((board[x][y] & mask1) >> 1) == color) {
@@ -796,6 +849,104 @@ extern "C" {
                 }
             }
         }
-        return localCounter;
+        for (int i = 0; i < localCounter * 6; i++) {
+            controlArr[i] = arr[i];
+        }
+        controlMoves = localCounter;
+        return controlMoves;
+    }
+    int calcCheckDefenseSquares(int color) {
+        // MARK: checkDefense
+        localCounter = 0;
+        moves = 0;
+        checkStopMoves = 0;
+        checkingPieces = 0;
+        int checkCounter = 0;
+        int moveX = 0;
+        int moveY = 0;
+        int x = 0;
+        int y = 0;
+        int dx = 0;
+        int dy = 0;
+        if (!checks[color]) {
+            for (int x = 0; x < 8; x++) {
+                for (int y = 0; y < 8; y++) {
+                    if ((board[x][y] & mask0) && ((board[x][y] & mask1) >> 1) == color) {
+                        oldMoveCount = moves;
+                        generateMoves(x, y, true);
+                        localCounter += (moves - oldMoveCount);
+                        for (int i = 0; i < localCounter; i++) {
+                            moveX = arr[i*6] + arr[i*6+2];
+                            moveY = arr[i*6+1] + arr[i*6+3];
+                            if ((board[moveX][moveY] & pieceMask) == KING) {
+                                x = arr[i * 6 + 0];
+                                y = arr[i * 6 + 1];
+                                dx = arr[i * 6 + 2];
+                                dy = arr[i * 6 + 3];
+                                checkingPieceToCapture[0] = x;
+                                checkingPieceToCapture[1] = y;
+                                checkingPieces++;
+                            }
+                            if (checkingPieces > 1) {
+                                return 0;
+                            }
+                        }
+                    }
+                }
+            }            
+            if (checkingPieces == 1) {
+                checks[color] = true;
+                if (dx != 0 && dy != 0) {
+                    // Diagonal
+                    if (dx > 0 && dy > 0) {
+                        // Up Right
+                        for (int z = 1; z < dx; z++) {
+                            addCheckstopMove(x + z, y + z);
+                        }
+                    }
+                    else if (dx < 0 && dy < 0) {
+                        // Down Left
+                        for (int z = 1; z < abs(dx); z++) {
+                            addCheckstopMove(x - z, y - z);
+                        }
+                    }
+                    else if (dx > 0 && dy < 0) {
+                        // Down Right
+                        for (int z = 1; z < abs(dx); z++) {
+                            addCheckstopMove(x + z, y - z);
+                        }
+                    }
+                    else if (dx < 0 && dy > 0) {
+                        // Up Left
+                        for (int z = 1; z < abs(dx); z++) {
+                            addCheckstopMove(x - z, y + z);
+                        }
+                    }
+                }
+                else if (dx != 0) {
+                    // Horizontal:
+                    //print("horizontal")
+                    int m = dx < 0 ? -1 : 1;
+                    for (int z = 1; z < abs(dx); z++) {
+                        addCheckstopMove(x + (m * z), y);
+                    }
+                }
+                else if (dy != 0) {
+                    // Vertical
+                    //print("vertical")
+                    int m = dy < 0 ? -1 : 1;
+                    for (int z = 1; z < abs(dy); z++) {
+                        addCheckstopMove(x, y + (m * z));
+                    }
+                }
+                return checkStopMoves;
+            }
+            else {
+                return 0;
+            }
+        }
+        else {
+            return 0;
+        }
     }
 }
